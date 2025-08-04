@@ -1,3 +1,4 @@
+/* === BASE STYLES === */
 html,
 body {
   margin: 0;
@@ -11,7 +12,24 @@ body {
   color: #e0e0ff;
 }
 
-/* ===== MAIN CONTAINER ===== */
+:root {
+  --sidebar-width: 250px;
+  --accent-color: rgb(187, 255, 0);
+  --text-color: #f0f0f0;
+  --background-color: #111;
+  --button-bg: #333;
+  --button-hover: #555;
+}
+
+body.light {
+  --accent-color: #5a00b0;
+  --text-color: #111;
+  --background-color: #fefefe;
+  --button-bg: #ddd;
+  --button-hover: #bbb;
+}
+
+/* === CONTAINER === */
 #container {
   display: flex;
   height: 100vh;
@@ -20,35 +38,37 @@ body {
   background-color: #000000;
 }
 
-/* ===== SIDEBAR ===== */
+/* === SIDEBAR === */
 #sidebar {
-  border: 2px solid white;
-  width: 250px;
-  min-width: 20px;
-  max-width: 400px;
+  width: var(--sidebar-width);
   background-color: #000000;
   padding: 20px 15px;
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  color: rgb(187, 255, 0);
+  color: var(--accent-color);
+  border: 2px solid white;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.8);
+  transition: width 0.15s ease, transform 0.3s ease;
+  flex-shrink: 1;
+  min-width: 0;
+}
 
-  flex-shrink: 1; /* allow it to shrink */
-  min-width: 0; /* prevent default fallback */
+#sidebar.collapsed {
+  transform: translateX(-100%);
 }
 
 .logo {
   font-weight: 800;
   font-size: 2rem;
   margin-bottom: 30px;
-  color: rgb(187, 255, 0);
+  color: var(--accent-color);
   text-align: left;
 }
 
 .nav-btn {
   background: none;
-  color: rgb(187, 255, 0);
+  color: var(--accent-color);
   font-size: 1.1rem;
   padding: 12px 16px;
   text-align: left;
@@ -63,7 +83,7 @@ body {
 
 .nav-btn:hover {
   background-color: #121212;
-  color: rgb(187, 255, 0);
+  color: var(--accent-color);
   border-right: 5px solid white;
 }
 
@@ -72,12 +92,7 @@ body {
   color: #000000;
 }
 
-.nav-btn span {
-  font-size: 1.3rem;
-  margin-right: 12px;
-}
-
-/* ===== MAIN CONTENT ===== */
+/* === MAIN CONTENT === */
 #main-content {
   flex-grow: 1;
   padding: 30px;
@@ -90,22 +105,22 @@ body {
   border: 2px solid white;
 }
 
-/* ===== CHARACTER CARD ===== */
+/* === CHARACTER CARD === */
 .character-card {
-  background-color: #1c1c1c;
+  background-color: black;
   border-radius: 18px;
   border: 2px solid white;
   padding: 24px 22px;
-  box-shadow: 0 0 12px whitecc;
   color: white;
   text-align: center;
   transition: box-shadow 0.22s ease-in-out, transform 0.25s ease;
   cursor: pointer;
   margin: 10px;
+  box-shadow: 0 0 12px #ffffffcc;
 }
 
 .character-card:hover {
-  box-shadow: 0 0 28px whitedd;
+  box-shadow: 0 0 28px #ffffffdd;
   transform: translateY(-6px);
 }
 
@@ -117,17 +132,20 @@ body {
   margin-bottom: 18px;
 }
 
+.character-name,
+.character-bio {
+  color: white;
+}
+
 .character-name {
   font-weight: 900;
   font-size: 1.5rem;
   margin-bottom: 10px;
-  color: white;
 }
 
 .character-bio {
   font-size: 1.1rem;
   font-style: italic;
-  color: white;
   margin-bottom: 22px;
 }
 
@@ -138,11 +156,10 @@ body {
   background-color: white;
   color: #000000;
   border-radius: 16px;
-  border: none;
-  box-shadow: 0 0 16px white33;
+  border: 1px solid black;
+  box-shadow: 0 0 16px #ffffff33;
   transition: background-color 0.28s ease, color 0.28s ease;
   cursor: pointer;
-  border: 1px solid black;
 }
 
 .select-btn:hover {
@@ -151,32 +168,17 @@ body {
   box-shadow: 0 0 22px white;
 }
 
-/* ===== SCROLLBAR ===== */
-#main-content::-webkit-scrollbar {
-  width: 14px;
-}
-
-#main-content::-webkit-scrollbar-track {
-  background-color: #121212;
-}
-
-#main-content::-webkit-scrollbar-thumb {
-  background-color: rgb(187, 255, 0);
-  border-radius: 24px;
-  border: 4px solid #121212;
-  box-shadow: inset 0 0 10px rgb(187, 255, 0);
-}
-
+/* === CHAT PANEL === */
 .chat-panel {
   display: flex;
   flex-direction: column;
-  height: 100%; /* fixed height to fit well in popup */
+  height: 100%;
   width: 100%;
   box-sizing: border-box;
-  background: #000000;
+  background: var(--background-color);
   border-radius: 18px;
   padding: 20px 24px;
-  box-shadow: 0 0 20px white;
+  box-shadow: 0 0 20px var(--text-color);
 }
 
 .chat-header {
@@ -184,19 +186,19 @@ body {
   align-items: center;
   gap: 16px;
   padding-bottom: 15px;
-  border-bottom: 2px solid white;
+  border-bottom: 2px solid var(--text-color);
 }
 
 .chat-avatar {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  border: 3px solid white;
+  border: 3px solid var(--text-color);
   object-fit: cover;
 }
 
 .chat-name {
-  color: white;
+  color: var(--text-color);
   font-weight: 900;
   font-size: 1.4rem;
 }
@@ -205,42 +207,37 @@ body {
   flex-grow: 1;
   margin-top: 16px;
   padding-right: 12px;
-  background: #121212;
+  background: var(--background-color);
   border-radius: 14px;
   overflow-y: auto;
   font-size: 1rem;
   line-height: 1.4;
-  color: white;
-  box-shadow: inset 0 0 10px white22;
+  color: var(--text-color);
+  box-shadow: inset 0 0 10px #ffffff22;
 }
 
-/* Individual chat messages */
 .message {
   margin-bottom: 14px;
   padding: 8px 12px;
   border-radius: 12px;
-  box-shadow: 0 1px 6px white33;
+  box-shadow: 0 1px 6px #ffffff33;
 }
 
 .message.user {
   background-color: #d1f0ff;
   color: #000;
-  padding: 8px 12px;
-  margin: 6px;
-  border-radius: 8px;
   align-self: flex-end;
   max-width: 100%;
   word-wrap: break-word;
 }
 
 .message.bot {
-  background: #091013;
-  color: white;
+  background: var(--bot-message-bg, #091013);
+  color: var(--text-color);
   font-style: italic;
   align-self: flex-start;
 }
 
-/* Chat input section */
 .chat-input-row {
   display: flex;
   gap: 14px;
@@ -253,18 +250,19 @@ body {
   flex: 1 1 0;
   min-width: 0;
   border-radius: 18px;
-  border: 2.5px solid white;
+  border: 2.5px solid var(--border-color);
   padding: 14px 20px;
   font-weight: 700;
   font-size: 1rem;
-  background: #121212;
-  color: white;
+  background: var(--background-color);
+  color: var(--text-color);
   outline-offset: 3px;
   transition: border-color 0.3s ease;
 }
 
 #chat-input::placeholder {
-  color: whitecc;
+  color: var(--text-color);
+  opacity: 0.7;
 }
 
 #chat-input:focus {
@@ -273,7 +271,7 @@ body {
 }
 
 #chat-send-btn {
-  background-color: white;
+  background-color: var(--accent-color);
   color: #121212;
   border: none;
   border-radius: 18px;
@@ -281,7 +279,7 @@ body {
   font-weight: 900;
   font-size: 1rem;
   cursor: pointer;
-  box-shadow: 0 0 15px white33;
+  box-shadow: 0 0 15px #ffffff33;
   transition: background-color 0.3s ease, color 0.3s ease;
   flex-shrink: 0;
 }
@@ -292,91 +290,149 @@ body {
   box-shadow: 0 0 20px #08f7fecc;
 }
 
-#resizer {
-  width: 6px;
-  background-color: #333;
-  cursor: ew-resize;
-  height: 100vh;
-  z-index: 10;
+/* === SCROLLBAR === */
+#main-content::-webkit-scrollbar {
+  width: 14px;
 }
 
-#sidebar {
-  transition: width 0.15s ease;
+#main-content::-webkit-scrollbar-track {
+  background-color: #121212;
 }
-/* Sidebar toggle button */
-#sidebar-toggle {
+
+#main-content::-webkit-scrollbar-thumb {
+  background-color: var(--accent-color);
+  border-radius: 24px;
+  border: 4px solid #121212;
+  box-shadow: inset 0 0 10px var(--accent-color);
+}
+
+/* === SETTINGS TOGGLE === */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 1001;
-  font-size: 24px;
-  background: rgba(0, 0, 0, 0.5);
-  border: none;
-  color: white;
-  padding: 8px 12px;
-  border-radius: 8px;
   cursor: pointer;
-  backdrop-filter: blur(4px);
-}
-
-/* Sidebar hide/show transition */
-#sidebar {
-  transition: transform 0.3s ease;
-}
-
-/* When sidebar is collapsed */
-#sidebar.collapsed {
-  transform: translateX(-100%);
-}
-
-/* Optional: Main overlay when sidebar is open */
-#main-overlay {
-  position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 1000;
-  display: none;
+  right: 0;
+  bottom: 0;
+  background-color: #444;
+  transition: 0.4s;
+  border-radius: 34px;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
 }
-#main-overlay.active {
-  display: block;
-}
-#overlay {
+
+.slider::before {
+  content: "";
   position: absolute;
-  top: 0;
-  left: var(--sidebar-width, 250px); /* Adjust this to your sidebar width */
-  width: calc(100% - var(--sidebar-width, 250px));
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  display: none;
+  height: 20px;
+  width: 20px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
 }
 
-#sidebar.collapsed + #overlay {
-  left: 0;
-  width: 100%;
-}
-#sidebar-toggle {
-  position: fixed;
-  top: 15px;
-  left: 15px;
-  z-index: 1100;
-  font-size: 24px;
-  background: transparent;
-  border: none;
-  color: white;
-  cursor: pointer;
-}
-#main {
-  margin-left: var(--sidebar-width, 250px);
-  transition: margin-left 0.3s ease;
+input:checked + .slider {
+  background-color: #00ff99;
 }
 
-#sidebar.collapsed ~ #main {
-  margin-left: 0;
+input:checked + .slider::before {
+  transform: translateX(22px);
 }
-:root {
-  --sidebar-width: 250px;
+
+.toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.toggle-label {
+  font-size: 1.2rem;
+  color: var(--text-color, #ccc);
+}
+
+body.light .toggle-label,
+body.light .theme-label {
+  color: #222;
+}
+
+/* === LIGHT MODE === */
+body.light {
+  background-color: #ffffff;
+  color: #111111;
+}
+
+body.light #sidebar {
+  background-color: #e0e0e0;
+  color: #000;
+  border-right: 2px solid #ccc;
+}
+
+body.light .nav-btn {
+  background-color: #ffffff;
+  border: 2px solid #bbbbbb;
+  color: #111111;
+}
+
+body.light .nav-btn:hover {
+  background-color: #dddddd;
+  color: #000;
+}
+
+body.light .nav-btn.active {
+  background-color: #f0f0f0;
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+body.light #main-content {
+  background-color: #ffffff;
+  color: #000;
+}
+
+body.light .character-card {
+  background-color: #fdfdfd;
+  color: #111;
+  border: 1.5px solid #ccc;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+body.light .character-name {
+  color: #222;
+}
+
+body.light .character-bio {
+  color: #555;
+}
+
+body.light .select-btn {
+  background-color: #eaeaea;
+  color: #000;
+  border: 1px solid #bbb;
+}
+
+body.light .select-btn:hover {
+  background-color: #d4d4d4;
+  color: #000;
+}
+body {
+  --bot-message-bg: #091013;
+}
+
+body.light {
+  --bot-message-bg: #f1f1f1;
 }

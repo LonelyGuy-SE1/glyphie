@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <title>Glyphie</title>
@@ -11,8 +11,6 @@
   </head>
   <body>
     <div id="container">
-      <!-- Toggle Sidebar Button -->
-
       <!-- Sidebar Navigation -->
       <nav id="sidebar" role="navigation" aria-label="Main navigation">
         <div id="overlay"></div>
@@ -48,8 +46,10 @@
           <span>⚙️</span> <span class="label">Settings</span>
         </button>
       </nav>
+
       <div id="resizer"></div>
-      <!-- Main Content with Chat Panel -->
+
+      <!-- Main Content -->
       <main
         id="main-content"
         role="main"
@@ -76,10 +76,31 @@
               type="text"
               id="chat-input"
               placeholder="Ask or enter your prompt…"
+              autocomplete="off"
             />
             <button id="chat-send-btn">Send</button>
           </div>
         </div>
+
+        <!-- Dynamic Content Sections -->
+        <section id="characters-section" class="content-section"></section>
+
+        <section id="stats-section" class="content-section hidden"></section>
+
+        <section id="settings-section" class="content-section hidden">
+          <h2>Settings panel coming soon!</h2>
+
+          <div class="appearance-section">
+            <h3>Appearance</h3>
+            <div class="toggle-wrapper">
+              <label class="switch">
+                <input type="checkbox" id="theme-toggle" />
+                <span class="slider"></span>
+              </label>
+              <span class="toggle-label">Dark Mode</span>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
 

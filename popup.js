@@ -35,24 +35,31 @@ const personalityPrompts = {
 
 const sidebarButtons = document.querySelectorAll("#sidebar .nav-btn");
 const mainContent = document.getElementById("main-content");
-
 let currentCharKey = null;
 let chatHistory = [];
 
+// === INIT ===
 function init() {
   sidebarButtons.forEach((button) => {
     button.addEventListener("click", () => {
       sidebarButtons.forEach((btn) => btn.classList.remove("active"));
       button.classList.add("active");
-
       const section = button.getAttribute("data-section");
       loadSection(section);
     });
   });
-
   loadSection("characters");
+  applySavedTheme();
 }
 
+function applySavedTheme() {
+  const savedTheme = localStorage.getItem("theme") || "dark";
+  document.body.classList.toggle("light", savedTheme === "light");
+  const toggle = document.getElementById("theme-toggle");
+  if (toggle) toggle.checked = savedTheme === "light";
+}
+
+// === LOAD SECTIONS ===
 function loadSection(section) {
   mainContent.innerHTML = "";
   currentCharKey = null;
@@ -64,6 +71,7 @@ function loadSection(section) {
   else mainContent.textContent = "This section is not available.";
 }
 
+// === RENDER CHARACTERS ===
 function renderCharacters() {
   const container = document.createElement("div");
   container.className = "character-grid";
@@ -88,9 +96,7 @@ function renderCharacters() {
     const btn = document.createElement("button");
     btn.className = "select-btn";
     btn.textContent = "Select";
-    btn.addEventListener("click", () => {
-      startChatWithPersonality(char.key);
-    });
+    btn.addEventListener("click", () => startChatWithPersonality(char.key));
 
     card.appendChild(img);
     card.appendChild(name);
@@ -103,6 +109,7 @@ function renderCharacters() {
   mainContent.appendChild(container);
 }
 
+// === RENDER STATS ===
 function renderStats() {
   const div = document.createElement("div");
   div.className = "placeholder";
@@ -110,13 +117,37 @@ function renderStats() {
   mainContent.appendChild(div);
 }
 
+// === RENDER SETTINGS ===
 function renderSettings() {
-  const div = document.createElement("div");
-  div.className = "placeholder";
-  div.textContent = "Settings panel coming soon!";
-  mainContent.appendChild(div);
+  const container = document.createElement("div");
+  container.className = "settings-container";
+
+  const themeSetting = document.createElement("div");
+  themeSetting.className = "setting-item";
+
+  const label = document.createElement("label");
+  label.htmlFor = "theme-toggle";
+  label.textContent = "Dark Mode:";
+
+  const toggle = document.createElement("input");
+  toggle.type = "checkbox";
+  toggle.id = "theme-toggle";
+  toggle.checked = !document.body.classList.contains("light");
+
+  toggle.addEventListener("change", (e) => {
+    const isDarkMode = e.target.checked;
+    document.body.classList.toggle("light", !isDarkMode);
+    localStorage.setItem("theme", isDarkMode ? "dark" : "light");
+  });
+
+  themeSetting.appendChild(label);
+  themeSetting.appendChild(toggle);
+  container.appendChild(themeSetting);
+
+  mainContent.appendChild(container);
 }
 
+// === CHAT UI ===
 function startChatWithPersonality(key) {
   currentCharKey = key;
   chatHistory = [];
@@ -208,6 +239,7 @@ function startChatWithPersonality(key) {
   input.focus();
 }
 
+// === HELPER FUNCTIONS ===
 function appendMessage(container, sender, text) {
   const msg = document.createElement("div");
   msg.className = `message ${sender}`;
@@ -256,4 +288,5 @@ async function sendToAgent(messages) {
   }
 }
 
+// === INIT ON LOAD ===
 document.addEventListener("DOMContentLoaded", init);
