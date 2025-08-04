@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Glyphie</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="container">
+      <!-- Toggle Sidebar Button -->
+
+      <!-- Sidebar Navigation -->
+      <nav id="sidebar" role="navigation" aria-label="Main navigation">
+        <div id="overlay"></div>
+        <div class="logo" aria-label="Glyphie logo">Glyphie</div>
+        <button
+          class="nav-btn active"
+          data-section="characters"
+          title="Characters"
+          aria-pressed="true"
+          role="tab"
+          tabindex="0"
+        >
+          <span>👾</span> <span class="label">Agents</span>
+        </button>
+        <button
+          class="nav-btn"
+          data-section="stats"
+          title="Usage Stats"
+          aria-pressed="false"
+          role="tab"
+          tabindex="-1"
+        >
+          <span>📊</span> <span class="label">Usage Stats</span>
+        </button>
+        <button
+          class="nav-btn"
+          data-section="settings"
+          title="Settings"
+          aria-pressed="false"
+          role="tab"
+          tabindex="-1"
+        >
+          <span>⚙️</span> <span class="label">Settings</span>
+        </button>
+      </nav>
+      <div id="resizer"></div>
+      <!-- Main Content with Chat Panel -->
+      <main
+        id="main-content"
+        role="main"
+        aria-live="polite"
+        aria-relevant="additions removals"
+        tabindex="0"
+      >
+        <div class="chat-panel">
+          <div class="chat-header">
+            <img
+              src="avatars/genz.png"
+              alt="GenZ Baddie avatar"
+              class="chat-avatar"
+            />
+            <span class="chat-name">GenZ Baddie</span>
+          </div>
+
+          <div class="chat-history" id="chat-history">
+            <!-- Chat messages will be appended here -->
+          </div>
+
+          <div class="chat-input-row">
+            <input
+              type="text"
+              id="chat-input"
+              placeholder="Ask or enter your prompt…"
+            />
+            <button id="chat-send-btn">Send</button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
