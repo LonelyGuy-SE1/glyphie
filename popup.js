@@ -217,7 +217,6 @@ async function sendMessageToThread(chatId, personaKey, message) {
   return data;
 }
 
-// Updated: startChatWithPersonality without prompts and with per-persona API keys
 async function startChatWithPersonality(key) {
   currentCharKey = key;
   chatHistory = [];
@@ -254,18 +253,21 @@ async function startChatWithPersonality(key) {
   setLoadingState(true, null);
 
   try {
-    // Use persona-specific API keys here
     currentChatId = await createChatThread(key);
     chatHistory = await getChatHistory(currentChatId, key);
-    chatHistory.forEach((msg) => {
-      const author =
-        msg.author_type &&
-        (msg.author_type.toLowerCase() === "api" ||
-          msg.author_type.toLowerCase() === "user")
-          ? "user"
-          : "bot";
-      appendMessage(chatHistoryDiv, author, msg.message);
-    });
+    // Append chat messages in chronological order (oldest first)
+    chatHistory
+      .slice() // clone to avoid modifying original array
+      .reverse() // reverse so oldest comes first
+      .forEach((msg) => {
+        const author =
+          msg.author_type &&
+          (msg.author_type.toLowerCase() === "api" ||
+            msg.author_type.toLowerCase() === "user")
+            ? "user"
+            : "bot";
+        appendMessage(chatHistoryDiv, author, msg.message);
+      });
   } catch (err) {
     appendMessage(chatHistoryDiv, "bot", "Unable to load chat history.");
     console.error(err);
@@ -276,14 +278,42 @@ async function startChatWithPersonality(key) {
   const inputRow = document.createElement("div");
   inputRow.className = "chat-input-row";
 
-  const input = document.createElement("input");
-  input.type = "text";
+  // Textarea for expandable input
+  const input = document.createElement("textarea");
   input.id = "chat-input";
   input.placeholder = "Ask or enter your prompt…";
+  input.rows = 1;
+  input.style.resize = "none";
+  input.style.overflow = "hidden";
+  input.style.flexGrow = "1";
+  input.style.fontSize = "1rem";
+  input.style.padding = "14px 20px";
+  input.style.borderRadius = "18px";
+  input.style.border = "2.5px solid var(--button-bg)";
+  input.style.background = "var(--background-color)";
+  input.style.color = "var(--text-color)";
+  input.style.outlineOffset = "3px";
+
+  input.addEventListener("input", () => {
+    input.style.height = "auto";
+    input.style.height = input.scrollHeight + "px";
+  });
 
   const sendBtn = document.createElement("button");
   sendBtn.id = "chat-send-btn";
   sendBtn.textContent = "Send";
+
+  const attachBtn = document.createElement("button");
+  attachBtn.id = "attach-btn";
+  attachBtn.title = "Attach files";
+  attachBtn.setAttribute("aria-label", "Attach files");
+  attachBtn.textContent = "📎";
+  attachBtn.style.cursor = "pointer";
+  attachBtn.style.fontSize = "1.25rem";
+  attachBtn.style.border = "none";
+  attachBtn.style.background = "none";
+  attachBtn.style.color = "var(--accent-color)";
+  attachBtn.style.padding = "0 12px";
 
   sendBtn.addEventListener("click", async () => {
     const userInput = input.value.trim();
@@ -293,6 +323,7 @@ async function startChatWithPersonality(key) {
     chatHistory.push({ role: "user", content: userInput });
 
     input.value = "";
+    input.style.height = "auto";
     setLoadingState(true, sendBtn);
 
     try {
@@ -331,6 +362,7 @@ async function startChatWithPersonality(key) {
   });
 
   inputRow.appendChild(input);
+  inputRow.appendChild(attachBtn);
   inputRow.appendChild(sendBtn);
 
   chatPanel.appendChild(chatHeader);
@@ -341,12 +373,13 @@ async function startChatWithPersonality(key) {
   input.focus();
 }
 
-// === HELPER FUNCTIONS ===
 function appendMessage(container, sender, text) {
   const msg = document.createElement("div");
   msg.className = `message ${sender}`;
   msg.textContent = text;
   container.appendChild(msg);
+
+  container.scrollTop = container.scrollHeight; // Auto-scroll on new message
 }
 
 function setLoadingState(isLoading, sendBtn) {
