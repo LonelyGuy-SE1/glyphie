@@ -1,36 +1,30 @@
 // === AI personalities data ===
 const characters = [
   {
-    key: "genz",
-    name: "GenZ Baddie",
-    bio: "Roasts, memes & emojis only.",
-    image: "avatars/genz.png",
-  },
-  {
-    key: "sage",
-    name: "Neon sage",
-    bio: "Explains like a wise sage.",
-    image: "avatars/neonsage.png",
+    key: "white",
+    name: "Agent White",
+    bio: "Your MultiPurpose AI Assistant. (White is your no bullshit assistant, who can help you with anything from coding to life advice.)",
+    image: "avatars/white.png",
   },
   {
     key: "dev",
     name: "Stack Monk",
-    bio: "Tech help and code mastery.",
+    bio: "I exist to bring clarity to chaos — guiding you through full-stack development with calm, precision, and mindful mastery.",
     image: "avatars/dev.png",
   },
   {
     key: "cat",
-    name: "Cat Therapist",
-    bio: "Gives snarky emotional support.",
+    name: "Dr. Paws",
+    bio: "I exist to help you feel seen, soothed, and slightly more human — with the quiet wisdom of a cat who’s been through nine lives of healing.",
     image: "avatars/cat.png",
   },
 ];
 
-const personalityPrompts = {
-  genz: "You are a sarcastic GenZ assistant who responds with memes, emojis, and casual slang.",
-  sage: "You respond patiently and wisely like a caring and knowledgeable sage.",
-  dev: "You are a precise technical expert focused on clear and concise coding help.",
-  cat: "You respond with sass and cat-like attitude, offering snarky emotional support.",
+// Map each character key to a unique API key for chat requests
+const characterApiKeys = {
+  white: "pk-7a4dbd1aa8d5b8a7b9bb320acee0bc25deab56639c84ddf88e1b82fd2e8dc4c9",
+  dev: "pk-f4101d1b38a8a1a784a8351c0364493caa107b2c3b7a0eead077c3c1bd615df8",
+  cat: "pk-70d8684a117f9e22c2383180def7f4e18ab4b73fb8024283466a80b4bdd77ab4",
 };
 
 const sidebarButtons = document.querySelectorAll("#sidebar .nav-btn");
@@ -39,8 +33,6 @@ let currentCharKey = null;
 let chatHistory = [];
 let currentChatId = null; // Persist server-side chat_id
 
-const API_KEY =
-  "sk-f6468c183380dd0167248a95174aea01b2681e311e50e975fe47e1afc9c955ad";
 const BASE_URL = "https://open.service.crestal.network/v1";
 
 // === INIT ===
@@ -74,7 +66,20 @@ function loadSection(section) {
   if (section === "characters") renderCharacters();
   else if (section === "stats") renderStats();
   else if (section === "settings") renderSettings();
+  else if (section === "snip") renderSnip();
   else mainContent.textContent = "This section is not available.";
+}
+
+function renderSnip() {
+  let snipSection = document.getElementById("snip-section");
+  if (!snipSection) {
+    mainContent.textContent = "Snip section unavailable.";
+    return;
+  }
+  mainContent.innerHTML = "";
+  const snipClone = snipSection.cloneNode(true);
+  snipClone.classList.remove("hidden");
+  mainContent.appendChild(snipClone);
 }
 
 // === RENDER CHARACTERS ===
@@ -153,19 +158,21 @@ function renderSettings() {
   mainContent.appendChild(container);
 }
 
-// === CHAT UI + HISTORY ===
-// --------- NEW HELPER FUNCTIONS FOR INTENTKIT API -----------
+// ===== IntentKit API helper functions with character-specific API key =====
+
 async function createChatThread(personaKey) {
-  // Save chatId per persona (allows parallel persona threads)
+  const personaApiKey = characterApiKeys[personaKey];
+  if (!personaApiKey) throw new Error("API key for persona not found");
+
   let chatId = localStorage.getItem(`intentkit_chatid_${personaKey}`);
   if (chatId) return chatId;
 
   const response = await fetch(`${BASE_URL}/chats`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${personaApiKey}`,
       "Content-Type": "application/json",
-    }, // Personalization: could send {user_id: ...}
+    },
     body: JSON.stringify({}),
   });
   if (!response.ok) throw new Error("Failed to create new chat thread");
@@ -175,37 +182,42 @@ async function createChatThread(personaKey) {
   return chatId;
 }
 
-async function getChatHistory(chatId, limit = 100) {
+async function getChatHistory(chatId, personaKey, limit = 100) {
+  const personaApiKey = characterApiKeys[personaKey];
+  if (!personaApiKey) throw new Error("API key for persona not found");
+
   const response = await fetch(
     `${BASE_URL}/chats/${chatId}/messages?limit=${limit}`,
     {
       headers: {
-        Authorization: `Bearer ${API_KEY}`,
+        Authorization: `Bearer ${personaApiKey}`,
         "Content-Type": "application/json",
       },
     }
   );
   if (!response.ok) throw new Error("Failed to fetch chat history");
-  const data = await response.json(); // Returns {data:[...], has_more:bool}
+  const data = await response.json();
   return data.data || [];
 }
 
-async function sendMessageToThread(chatId, message) {
+async function sendMessageToThread(chatId, personaKey, message) {
+  const personaApiKey = characterApiKeys[personaKey];
+  if (!personaApiKey) throw new Error("API key for persona not found");
+
   const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${personaApiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ message }),
   });
   if (!response.ok) throw new Error("Failed to send message to agent");
-  const data = await response.json(); // Returns list of agent/assistant message objects
+  const data = await response.json();
   return data;
 }
-// --------- END NEW HELPER FUNCTIONS -----------
 
-// (Below changed to async)
+// Updated: startChatWithPersonality without prompts and with per-persona API keys
 async function startChatWithPersonality(key) {
   currentCharKey = key;
   chatHistory = [];
@@ -218,6 +230,11 @@ async function startChatWithPersonality(key) {
   chatHeader.className = "chat-header";
 
   const persona = characters.find((c) => c.key === key);
+  if (!persona) {
+    mainContent.textContent = "Persona not found.";
+    return;
+  }
+
   const avatar = document.createElement("img");
   avatar.className = "chat-avatar";
   avatar.src = persona.image;
@@ -232,15 +249,15 @@ async function startChatWithPersonality(key) {
 
   const chatHistoryDiv = document.createElement("div");
   chatHistoryDiv.id = "chat-history";
-  chatHistoryDiv.className = "chat-history"; // --- Load (or create) chat thread and message history
+  chatHistoryDiv.className = "chat-history";
 
-  setLoadingState(true, null); // Show loading (button will re-enable itself)
+  setLoadingState(true, null);
 
   try {
+    // Use persona-specific API keys here
     currentChatId = await createChatThread(key);
-    chatHistory = await getChatHistory(currentChatId); // Render previous message history
+    chatHistory = await getChatHistory(currentChatId, key);
     chatHistory.forEach((msg) => {
-      // Treat "API", "user", "USER" as user, everything else as bot
       const author =
         msg.author_type &&
         (msg.author_type.toLowerCase() === "api" ||
@@ -279,8 +296,11 @@ async function startChatWithPersonality(key) {
     setLoadingState(true, sendBtn);
 
     try {
-      // --- Send to IntentKit agent, get model reply
-      const agentReplies = await sendMessageToThread(currentChatId, userInput);
+      const agentReplies = await sendMessageToThread(
+        currentChatId,
+        key,
+        userInput
+      );
 
       if (Array.isArray(agentReplies)) {
         agentReplies.forEach((msgObj) => {
@@ -330,52 +350,11 @@ function appendMessage(container, sender, text) {
 }
 
 function setLoadingState(isLoading, sendBtn) {
-  // If sendBtn provided, disable/enable only that button
   if (sendBtn) {
     sendBtn.disabled = isLoading;
     sendBtn.textContent = isLoading ? "Loading…" : "Send";
   } else {
-    // Otherwise, optionally show loading overlay or cursor
-    if (isLoading) {
-      document.body.style.cursor = "wait";
-    } else {
-      document.body.style.cursor = "";
-    }
-  }
-}
-
-// Optionally keep sendToAgent for compatibility/stats/legacy
-async function sendToAgent(messages) {
-  // You can remove this function if not using the OpenAI style endpoint anymore.
-  const API_URL = "https://open.service.crestal.network/v1/chat/completions";
-  try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: messages,
-        temperature: 0.8,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`API error ${response.status}: ${errText}`);
-    }
-
-    const data = await response.json();
-    if (data.choices && data.choices.length > 0) {
-      return data.choices[0].message.content;
-    }
-
-    return "Sorry, no reply was generated.";
-  } catch (error) {
-    console.error("Error communicating with Nation Agent API:", error);
-    throw error;
+    document.body.style.cursor = isLoading ? "wait" : "";
   }
 }
 
@@ -384,7 +363,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const toggleBtn = document.getElementById("sidebar-toggle");
   const overlay = document.getElementById("main-content-overlay");
 
-  // Initially sidebar closed: no '.open' class
   sidebar.classList.remove("open");
   toggleBtn.textContent = "☰";
 
@@ -403,6 +381,7 @@ document.addEventListener("DOMContentLoaded", function () {
     toggleBtn.textContent = "☰";
   });
 });
+
 document.addEventListener("DOMContentLoaded", function () {
   const toggleBtn = document.getElementById("sidebar-toggle");
   const container = document.getElementById("container");
@@ -410,7 +389,6 @@ document.addEventListener("DOMContentLoaded", function () {
   let offsetX = 0,
     offsetY = 0;
 
-  // Restore saved position or use defaults
   const savedLeft = localStorage.getItem("sidebarToggleLeft");
   const savedTop = localStorage.getItem("sidebarToggleTop");
   if (savedLeft && savedTop) {
@@ -418,7 +396,6 @@ document.addEventListener("DOMContentLoaded", function () {
     toggleBtn.style.top = savedTop;
     toggleBtn.style.position = "absolute";
   } else {
-    // Set default position if needed
     toggleBtn.style.position = "absolute";
     toggleBtn.style.top = "10px";
     toggleBtn.style.right = "10px";
@@ -426,11 +403,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   toggleBtn.addEventListener("mousedown", function (e) {
     isDragging = true;
-    // Calculate offset between cursor and element top-left corner
     offsetX = e.clientX - toggleBtn.offsetLeft;
     offsetY = e.clientY - toggleBtn.offsetTop;
     toggleBtn.style.transition = "none";
-    // Remove right if exists so left/top can take effect smoothly
     toggleBtn.style.right = "auto";
   });
 
@@ -440,7 +415,6 @@ document.addEventListener("DOMContentLoaded", function () {
     let x = e.clientX - offsetX;
     let y = e.clientY - offsetY;
 
-    // Boundaries to keep button inside #container
     const contRect = container.getBoundingClientRect();
     const btnRect = toggleBtn.getBoundingClientRect();
 
@@ -454,9 +428,8 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("mouseup", function () {
     if (isDragging) {
       isDragging = false;
-      toggleBtn.style.transition = ""; // restore transition
+      toggleBtn.style.transition = "";
 
-      // Save current position to localStorage
       localStorage.setItem("sidebarToggleLeft", toggleBtn.style.left);
       localStorage.setItem("sidebarToggleTop", toggleBtn.style.top);
     }
