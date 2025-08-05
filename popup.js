@@ -43,8 +43,17 @@ function init() {
       button.classList.add("active");
       const section = button.getAttribute("data-section");
       loadSection(section);
+
+      // Auto-close sidebar on selection
+      const sidebar = document.getElementById("sidebar");
+      const toggleBtn = document.getElementById("sidebar-toggle");
+      if (sidebar.classList.contains("open")) {
+        sidebar.classList.remove("open");
+        toggleBtn.textContent = "☰";
+      }
     });
   });
+
   loadSection("characters");
   applySavedTheme();
 }
@@ -255,6 +264,7 @@ async function startChatWithPersonality(key) {
   try {
     currentChatId = await createChatThread(key);
     chatHistory = await getChatHistory(currentChatId, key);
+    // Append messages oldest first
     chatHistory
       .slice()
       .reverse()
@@ -267,6 +277,8 @@ async function startChatWithPersonality(key) {
             : "bot";
         appendMessage(chatHistoryDiv, author, msg.message);
       });
+    // Scroll to latest after loading history
+    chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
   } catch (err) {
     appendMessage(chatHistoryDiv, "bot", "Unable to load chat history.");
     console.error(err);
@@ -277,7 +289,7 @@ async function startChatWithPersonality(key) {
   const inputRow = document.createElement("div");
   inputRow.className = "chat-input-row";
 
-  // Toolbar above the inputRow with attachment and regenerate buttons
+  // Toolbar above input for attachment and regenerate buttons
   const toolbar = document.createElement("div");
   toolbar.className = "chat-toolbar";
   toolbar.style.display = "flex";
