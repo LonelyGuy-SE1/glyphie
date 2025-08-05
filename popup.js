@@ -277,8 +277,10 @@ async function startChatWithPersonality(key) {
             : "bot";
         appendMessage(chatHistoryDiv, author, msg.message);
       });
-    // Scroll to latest after loading history
-    chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+    // Ensure chat scrolls fully to the latest after DOM updates
+    setTimeout(() => {
+      chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+    }, 0);
   } catch (err) {
     appendMessage(chatHistoryDiv, "bot", "Unable to load chat history.");
     console.error(err);
