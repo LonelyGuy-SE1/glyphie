@@ -37,6 +37,11 @@ const sidebarButtons = document.querySelectorAll("#sidebar .nav-btn");
 const mainContent = document.getElementById("main-content");
 let currentCharKey = null;
 let chatHistory = [];
+let currentChatId = null; // Persist server-side chat_id
+
+const API_KEY =
+  "sk-f6468c183380dd0167248a95174aea01b2681e311e50e975fe47e1afc9c955ad";
+const BASE_URL = "https://open.service.crestal.network/v1";
 
 // === INIT ===
 function init() {
@@ -64,6 +69,7 @@ function loadSection(section) {
   mainContent.innerHTML = "";
   currentCharKey = null;
   chatHistory = [];
+  currentChatId = null;
 
   if (section === "characters") renderCharacters();
   else if (section === "stats") renderStats();
@@ -147,11 +153,62 @@ function renderSettings() {
   mainContent.appendChild(container);
 }
 
-// === CHAT UI ===
-function startChatWithPersonality(key) {
+// === CHAT UI + HISTORY ===
+// --------- NEW HELPER FUNCTIONS FOR INTENTKIT API -----------
+async function createChatThread(personaKey) {
+  // Save chatId per persona (allows parallel persona threads)
+  let chatId = localStorage.getItem(`intentkit_chatid_${personaKey}`);
+  if (chatId) return chatId;
+
+  const response = await fetch(`${BASE_URL}/chats`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+    }, // Personalization: could send {user_id: ...}
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw new Error("Failed to create new chat thread");
+  const data = await response.json();
+  chatId = data.id;
+  localStorage.setItem(`intentkit_chatid_${personaKey}`, chatId);
+  return chatId;
+}
+
+async function getChatHistory(chatId, limit = 100) {
+  const response = await fetch(
+    `${BASE_URL}/chats/${chatId}/messages?limit=${limit}`,
+    {
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  if (!response.ok) throw new Error("Failed to fetch chat history");
+  const data = await response.json(); // Returns {data:[...], has_more:bool}
+  return data.data || [];
+}
+
+async function sendMessageToThread(chatId, message) {
+  const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ message }),
+  });
+  if (!response.ok) throw new Error("Failed to send message to agent");
+  const data = await response.json(); // Returns list of agent/assistant message objects
+  return data;
+}
+// --------- END NEW HELPER FUNCTIONS -----------
+
+// (Below changed to async)
+async function startChatWithPersonality(key) {
   currentCharKey = key;
   chatHistory = [];
-
   mainContent.innerHTML = "";
 
   const chatPanel = document.createElement("div");
@@ -175,7 +232,29 @@ function startChatWithPersonality(key) {
 
   const chatHistoryDiv = document.createElement("div");
   chatHistoryDiv.id = "chat-history";
-  chatHistoryDiv.className = "chat-history";
+  chatHistoryDiv.className = "chat-history"; // --- Load (or create) chat thread and message history
+
+  setLoadingState(true, null); // Show loading (button will re-enable itself)
+
+  try {
+    currentChatId = await createChatThread(key);
+    chatHistory = await getChatHistory(currentChatId); // Render previous message history
+    chatHistory.forEach((msg) => {
+      // Treat "API", "user", "USER" as user, everything else as bot
+      const author =
+        msg.author_type &&
+        (msg.author_type.toLowerCase() === "api" ||
+          msg.author_type.toLowerCase() === "user")
+          ? "user"
+          : "bot";
+      appendMessage(chatHistoryDiv, author, msg.message);
+    });
+  } catch (err) {
+    appendMessage(chatHistoryDiv, "bot", "Unable to load chat history.");
+    console.error(err);
+  }
+
+  setLoadingState(false, null);
 
   const inputRow = document.createElement("div");
   inputRow.className = "chat-input-row";
@@ -195,19 +274,22 @@ function startChatWithPersonality(key) {
 
     appendMessage(chatHistoryDiv, "user", userInput);
     chatHistory.push({ role: "user", content: userInput });
+
     input.value = "";
     setLoadingState(true, sendBtn);
 
     try {
-      const messagesToSend = [
-        { role: "system", content: personalityPrompts[currentCharKey] || "" },
-        ...chatHistory,
-      ];
+      // --- Send to IntentKit agent, get model reply
+      const agentReplies = await sendMessageToThread(currentChatId, userInput);
 
-      const reply = await sendToAgent(messagesToSend);
-
-      appendMessage(chatHistoryDiv, "bot", reply);
-      chatHistory.push({ role: "assistant", content: reply });
+      if (Array.isArray(agentReplies)) {
+        agentReplies.forEach((msgObj) => {
+          appendMessage(chatHistoryDiv, "bot", msgObj.message);
+          chatHistory.push({ role: "assistant", content: msgObj.message });
+        });
+      } else {
+        appendMessage(chatHistoryDiv, "bot", "No reply from agent.");
+      }
       chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
     } catch (error) {
       appendMessage(
@@ -248,15 +330,24 @@ function appendMessage(container, sender, text) {
 }
 
 function setLoadingState(isLoading, sendBtn) {
-  sendBtn.disabled = isLoading;
-  sendBtn.textContent = isLoading ? "Loading…" : "Send";
+  // If sendBtn provided, disable/enable only that button
+  if (sendBtn) {
+    sendBtn.disabled = isLoading;
+    sendBtn.textContent = isLoading ? "Loading…" : "Send";
+  } else {
+    // Otherwise, optionally show loading overlay or cursor
+    if (isLoading) {
+      document.body.style.cursor = "wait";
+    } else {
+      document.body.style.cursor = "";
+    }
+  }
 }
 
+// Optionally keep sendToAgent for compatibility/stats/legacy
 async function sendToAgent(messages) {
-  const API_KEY =
-    "sk-f6468c183380dd0167248a95174aea01b2681e311e50e975fe47e1afc9c955ad";
+  // You can remove this function if not using the OpenAI style endpoint anymore.
   const API_URL = "https://open.service.crestal.network/v1/chat/completions";
-
   try {
     const response = await fetch(API_URL, {
       method: "POST",
@@ -287,6 +378,90 @@ async function sendToAgent(messages) {
     throw error;
   }
 }
+
+document.addEventListener("DOMContentLoaded", function () {
+  const sidebar = document.getElementById("sidebar");
+  const toggleBtn = document.getElementById("sidebar-toggle");
+  const overlay = document.getElementById("main-content-overlay");
+
+  // Initially sidebar closed: no '.open' class
+  sidebar.classList.remove("open");
+  toggleBtn.textContent = "☰";
+
+  toggleBtn.addEventListener("click", () => {
+    if (sidebar.classList.contains("open")) {
+      sidebar.classList.remove("open");
+      toggleBtn.textContent = "☰";
+    } else {
+      sidebar.classList.add("open");
+      toggleBtn.textContent = "✖";
+    }
+  });
+
+  overlay.addEventListener("click", () => {
+    sidebar.classList.remove("open");
+    toggleBtn.textContent = "☰";
+  });
+});
+document.addEventListener("DOMContentLoaded", function () {
+  const toggleBtn = document.getElementById("sidebar-toggle");
+  const container = document.getElementById("container");
+  let isDragging = false;
+  let offsetX = 0,
+    offsetY = 0;
+
+  // Restore saved position or use defaults
+  const savedLeft = localStorage.getItem("sidebarToggleLeft");
+  const savedTop = localStorage.getItem("sidebarToggleTop");
+  if (savedLeft && savedTop) {
+    toggleBtn.style.left = savedLeft;
+    toggleBtn.style.top = savedTop;
+    toggleBtn.style.position = "absolute";
+  } else {
+    // Set default position if needed
+    toggleBtn.style.position = "absolute";
+    toggleBtn.style.top = "10px";
+    toggleBtn.style.right = "10px";
+  }
+
+  toggleBtn.addEventListener("mousedown", function (e) {
+    isDragging = true;
+    // Calculate offset between cursor and element top-left corner
+    offsetX = e.clientX - toggleBtn.offsetLeft;
+    offsetY = e.clientY - toggleBtn.offsetTop;
+    toggleBtn.style.transition = "none";
+    // Remove right if exists so left/top can take effect smoothly
+    toggleBtn.style.right = "auto";
+  });
+
+  document.addEventListener("mousemove", function (e) {
+    if (!isDragging) return;
+
+    let x = e.clientX - offsetX;
+    let y = e.clientY - offsetY;
+
+    // Boundaries to keep button inside #container
+    const contRect = container.getBoundingClientRect();
+    const btnRect = toggleBtn.getBoundingClientRect();
+
+    x = Math.max(0, Math.min(x, contRect.width - btnRect.width));
+    y = Math.max(0, Math.min(y, contRect.height - btnRect.height));
+
+    toggleBtn.style.left = x + "px";
+    toggleBtn.style.top = y + "px";
+  });
+
+  document.addEventListener("mouseup", function () {
+    if (isDragging) {
+      isDragging = false;
+      toggleBtn.style.transition = ""; // restore transition
+
+      // Save current position to localStorage
+      localStorage.setItem("sidebarToggleLeft", toggleBtn.style.left);
+      localStorage.setItem("sidebarToggleTop", toggleBtn.style.top);
+    }
+  });
+});
 
 // === INIT ON LOAD ===
 document.addEventListener("DOMContentLoaded", init);

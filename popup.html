@@ -11,114 +11,112 @@
   </head>
   <body>
     <div id="container">
-      <!-- Sidebar Navigation -->
-      <nav id="sidebar" role="navigation" aria-label="Main navigation">
-        <div id="overlay"></div>
-        <div class="logo" aria-label="Glyphie logo">Glyphie</div>
-        <button
-          class="nav-btn active"
-          data-section="characters"
-          title="Characters"
-          aria-pressed="true"
-          role="tab"
+      <div id="wrapper">
+        <!-- Sidebar Navigation -->
+        <nav id="sidebar" role="navigation" aria-label="Main navigation">
+          <div class="logo" aria-label="Glyphie logo">Glyphie</div>
+          <button
+            class="nav-btn active"
+            data-section="characters"
+            title="Characters"
+            aria-pressed="true"
+            role="tab"
+            tabindex="0"
+          >
+            <span>👾</span> <span class="label">Agents</span>
+          </button>
+          <button
+            class="nav-btn"
+            data-section="stats"
+            title="Usage Stats"
+            aria-pressed="false"
+            role="tab"
+            tabindex="-1"
+          >
+            <span>📊</span> <span class="label">Usage Stats</span>
+          </button>
+          <button
+            class="nav-btn"
+            data-section="snip"
+            title="Snip Tool"
+            aria-pressed="false"
+            role="tab"
+            tabindex="-1"
+          >
+            <span>✂️</span> <span class="label">Snip</span>
+          </button>
+          <button
+            class="nav-btn"
+            data-section="settings"
+            title="Settings"
+            aria-pressed="false"
+            role="tab"
+            tabindex="-1"
+          >
+            <span>⚙️</span> <span class="label">Settings</span>
+          </button>
+        </nav>
+        <!-- Main Content -->
+        <main
+          id="main-content"
+          role="main"
+          aria-live="polite"
+          aria-relevant="additions removals"
           tabindex="0"
         >
-          <span>👾</span> <span class="label">Agents</span>
-        </button>
-        <button
-          class="nav-btn"
-          data-section="stats"
-          title="Usage Stats"
-          aria-pressed="false"
-          role="tab"
-          tabindex="-1"
-        >
-          <span>📊</span> <span class="label">Usage Stats</span>
-        </button>
-        <button
-          class="nav-btn"
-          data-section="snip"
-          title="Snip Tool"
-          aria-pressed="false"
-          role="tab"
-          tabindex="-1"
-        >
-          <span>✂️</span> <span class="label">Snip</span>
-        </button>
-
-        <button
-          class="nav-btn"
-          data-section="settings"
-          title="Settings"
-          aria-pressed="false"
-          role="tab"
-          tabindex="-1"
-        >
-          <span>⚙️</span> <span class="label">Settings</span>
-        </button>
-      </nav>
-
-      <div id="resizer"></div>
-
-      <!-- Main Content -->
-      <main
-        id="main-content"
-        role="main"
-        aria-live="polite"
-        aria-relevant="additions removals"
-        tabindex="0"
-      >
-        <div class="chat-panel">
-          <div class="chat-header">
-            <img
-              src="avatars/genz.png"
-              alt="GenZ Baddie avatar"
-              class="chat-avatar"
-            />
-            <span class="chat-name">GenZ Baddie</span>
-          </div>
-
-          <div class="chat-history" id="chat-history">
-            <!-- Chat messages will be appended here -->
-          </div>
-
-          <div class="chat-input-row">
-            <input
-              type="text"
-              id="chat-input"
-              placeholder="Ask or enter your prompt…"
-              autocomplete="off"
-            />
-            <button id="chat-send-btn">Send</button>
-          </div>
-        </div>
-
-        <!-- Dynamic Content Sections -->
-        <section id="characters-section" class="content-section"></section>
-
-        <section id="stats-section" class="content-section hidden"></section>
-
-        <section id="settings-section" class="content-section hidden">
-          <h2>Settings panel coming soon!</h2>
-
-          <div class="appearance-section">
-            <h3>Appearance</h3>
-            <div class="toggle-wrapper">
-              <label class="switch">
-                <input type="checkbox" id="theme-toggle" />
-                <span class="slider"></span>
-              </label>
-              <span class="toggle-label">Dark Mode</span>
+          <div class="chat-panel">
+            <div class="chat-header">
+              <img
+                src="avatars/genz.png"
+                alt="GenZ Baddie avatar"
+                class="chat-avatar"
+              />
+              <span class="chat-name">GenZ Baddie</span>
+            </div>
+            <div class="chat-history" id="chat-history">
+              <!-- Chat messages will be appended here -->
+            </div>
+            <div class="chat-input-row">
+              <input
+                type="text"
+                id="chat-input"
+                placeholder="Ask or enter your prompt…"
+                autocomplete="off"
+              />
+              <button id="chat-send-btn">Send</button>
             </div>
           </div>
-        </section>
-        <section id="snip-section" class="content-section hidden">
-          <h2>Snip Mode ✂️</h2>
-          <p>Use this tool to capture and attach screen snippets.</p>
-        </section>
-      </main>
+          <!-- Dynamic Content Sections -->
+          <section id="characters-section" class="content-section"></section>
+          <section id="stats-section" class="content-section hidden"></section>
+          <section id="settings-section" class="content-section hidden">
+            <h2>Settings panel coming soon!</h2>
+            <div class="appearance-section">
+              <h3>Appearance</h3>
+              <div class="setting-item">
+                <label for="theme-toggle" class="toggle-label"
+                  >🌗 Dark Mode:</label
+                >
+                <input type="checkbox" id="theme-toggle" class="toggle-input" />
+                <span class="custom-slider"></span>
+              </div>
+            </div>
+          </section>
+          <section id="snip-section" class="content-section hidden">
+            <h2>Snip Mode ✂️</h2>
+            <p>Use this tool to capture and attach screen snippets.</p>
+          </section>
+        </main>
+      </div>
+      <!-- Overlay and Toggle are siblings of #wrapper for best stacking order -->
+      <div id="main-content-overlay"></div>
+      <button
+        id="sidebar-toggle"
+        style="position: absolute; top: 10px; right: 10px"
+      >
+        ☰
+      </button>
     </div>
-
     <script src="popup.js"></script>
   </body>
 </html>

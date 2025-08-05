@@ -1,11 +1,12 @@
 /* === BASE STYLES === */
 html,
 body {
+  min-width: 600px;
+  min-height: 900px;
+  box-sizing: border-box;
+  overflow: auto;
   margin: 0;
   padding: 0;
-  width: 600px;
-  height: 900px;
-  overflow: hidden;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   background-color: #000000;
@@ -33,14 +34,22 @@ body.light {
 #container {
   display: flex;
   height: 100vh;
-  width: 600px;
+  width: 100vw;
   overflow: hidden;
-  background-color: #000000;
+  background-color: var(--background-color);
+}
+
+/* === WRAPPER === */
+#wrapper {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
 }
 
 /* === SIDEBAR === */
 #sidebar {
   width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
   background-color: #000000;
   padding: 20px 15px;
   display: flex;
@@ -49,13 +58,11 @@ body.light {
   color: var(--accent-color);
   border: 2px solid white;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.8);
-  transition: width 0.15s ease, transform 0.3s ease;
-  flex-shrink: 1;
+  transition: transform 0.3s ease, width 0.15s ease;
+  flex-shrink: 0;
   min-width: 0;
-}
-
-#sidebar.collapsed {
-  transform: translateX(-100%);
+  position: relative; /* keep in flow with flex */
+  z-index: 1000;
 }
 
 .logo {
@@ -94,15 +101,28 @@ body.light {
 
 /* === MAIN CONTENT === */
 #main-content {
-  flex-grow: 1;
-  padding: 30px;
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--background-color, #111);
   overflow-y: auto;
-  background-color: black;
-  color: white;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 24px;
-  border: 2px solid white;
+  transition: filter 0.3s ease;
+  z-index: 1; /* below sidebar */
+  margin-left: 0 !important; /* important in case overridden */
+}
+
+/* Overlay to dim main content when sidebar is open */
+#main-content-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 1050;
 }
 
 /* === CHARACTER CARD === */
@@ -250,7 +270,7 @@ body.light {
   flex: 1 1 0;
   min-width: 0;
   border-radius: 18px;
-  border: 2.5px solid var(--border-color);
+  border: 2.5px solid var(--button-bg);
   padding: 14px 20px;
   font-weight: 700;
   font-size: 1rem;
@@ -429,10 +449,165 @@ body.light .select-btn:hover {
   background-color: #d4d4d4;
   color: #000;
 }
+
+/* Bot message background variables */
 body {
   --bot-message-bg: #091013;
 }
 
 body.light {
   --bot-message-bg: #f1f1f1;
+}
+
+/* Snip box style */
+.snip-box.saved {
+  border: 2px dashed #00ffaa;
+  background-color: rgba(0, 255, 170, 0.1);
+}
+#sidebar-toggle {
+  position: absolute; /* changed from fixed */
+  top: 10px;
+  right: 10px;
+  z-index: 1100;
+  cursor: move;
+  font-size: 1.8em;
+  background: rgb(124, 163, 18);
+  border: none;
+  color: white;
+  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  box-shadow: 0 0 10px #4caf50aa;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  user-select: none;
+}
+
+/* Toggle button hover effect */
+#sidebar-toggle:hover {
+  background-color: rgb(187, 255, 0);
+  box-shadow: 0 0 15px rgb(187, 255, 0);
+}
+/* Wrapper & main content fill full area */
+#container,
+#wrapper,
+#main-content {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Main content fills fully always */
+#main-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: var(--background-color);
+  transition: filter 0.3s ease;
+  overflow-y: auto;
+  z-index: 1; /* below sidebar */
+}
+
+/* Sidebar Fixed Overlay */
+#sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  height: 100vh;
+  background-color: #000;
+  color: var(--accent-color);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.8);
+  transform: translateX(-100%); /* hidden by default */
+  transition: transform 0.3s ease;
+  z-index: 1000;
+}
+
+/* Show sidebar when 'open' class is present */
+#sidebar.open {
+  transform: translateX(0);
+}
+
+/* Overlay covering main content when sidebar open */
+#main-content-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 900;
+}
+
+/* Show overlay when sidebar is open */
+#sidebar.open ~ #main-content-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Optional: blur main content when sidebar open */
+#sidebar.open ~ #main-content {
+  filter: blur(2px);
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+}
+
+.toggle-label {
+  font-size: 1.1em;
+  color: var(--text-color, #e0e0ff);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.custom-slider {
+  position: relative;
+  width: 48px;
+  height: 24px;
+  background: #333;
+  border-radius: 24px;
+  transition: background 0.3s;
+  cursor: pointer;
+  box-shadow: 0 2px 6px #0004;
+  display: inline-block;
+}
+
+.custom-slider::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.3s cubic-bezier(0.4, 2.4, 0.5, 1), background 0.3s;
+  box-shadow: 0 1px 4px #0002;
+}
+
+.toggle-input:checked + .custom-slider {
+  background: #7aff81;
+}
+
+.toggle-input:checked + .custom-slider::before {
+  transform: translateX(24px);
+  background: #222;
 }

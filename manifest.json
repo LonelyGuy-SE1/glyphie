@@ -3,7 +3,14 @@
   "name": "Glyphie",
   "version": "1.0",
   "description": "Snip screen parts and chat with AI personalities.",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
