@@ -27,16 +27,6 @@
           </button>
           <button
             class="nav-btn"
-            data-section="stats"
-            title="Usage Stats"
-            aria-pressed="false"
-            role="tab"
-            tabindex="-1"
-          >
-            <span>📊</span> <span class="label">Usage Stats</span>
-          </button>
-          <button
-            class="nav-btn"
             data-section="snip"
             title="Snip Tool"
             aria-pressed="false"
@@ -55,6 +45,16 @@
           >
             <span>⚙️</span> <span class="label">Settings</span>
           </button>
+          <button
+            class="nav-btn"
+            data-section="stats"
+            title="Usage Stats"
+            aria-pressed="false"
+            role="tab"
+            tabindex="-1"
+          >
+            <span>📊</span> <span class="label">Usage Stats</span>
+          </button>
         </nav>
         <!-- Main Content -->
         <main
@@ -67,11 +67,11 @@
           <div class="chat-panel">
             <div class="chat-header">
               <img
-                src="avatars/genz.png"
-                alt="GenZ Baddie avatar"
+                src="avatars/white.png"
+                alt="Agent White avatar"
                 class="chat-avatar"
               />
-              <span class="chat-name">GenZ Baddie</span>
+              <span class="chat-name">Agent White</span>
             </div>
             <div class="chat-history" id="chat-history">
               <!-- Chat messages will be appended here -->
@@ -103,8 +103,24 @@
             </div>
           </section>
           <section id="snip-section" class="content-section hidden">
-            <h2>Snip Mode ✂️</h2>
-            <p>Use this tool to capture and attach screen snippets.</p>
+            <div class="chat-panel">
+              <div class="chat-header">
+                <span>Snip Mode ✂️</span>
+              </div>
+              <div class="chat-history" id="snip-chat-history">
+                <!-- Snip chat messages and attachments will appear here -->
+              </div>
+              <div class="chat-input-row">
+                <button id="snip-btn" title="Start a new snip">Snip ✂️</button>
+                <input
+                  type="text"
+                  id="snip-chat-input"
+                  placeholder="Add a message (optional)..."
+                  autocomplete="off"
+                />
+                <button id="snip-send-btn">Send</button>
+              </div>
+            </div>
           </section>
         </main>
       </div>
