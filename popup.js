@@ -158,7 +158,7 @@ function renderSettings() {
   mainContent.appendChild(container);
 }
 
-// ===== IntentKit API helper functions with character-specific API key =====
+// IntentKit API helper functions with character-specific API key
 
 async function createChatThread(personaKey) {
   const personaApiKey = characterApiKeys[personaKey];
@@ -255,10 +255,9 @@ async function startChatWithPersonality(key) {
   try {
     currentChatId = await createChatThread(key);
     chatHistory = await getChatHistory(currentChatId, key);
-    // Append chat messages in chronological order (oldest first)
     chatHistory
-      .slice() // clone to avoid modifying original array
-      .reverse() // reverse so oldest comes first
+      .slice()
+      .reverse()
       .forEach((msg) => {
         const author =
           msg.author_type &&
@@ -278,7 +277,63 @@ async function startChatWithPersonality(key) {
   const inputRow = document.createElement("div");
   inputRow.className = "chat-input-row";
 
-  // Textarea for expandable input
+  // Toolbar above the inputRow with attachment and regenerate buttons
+  const toolbar = document.createElement("div");
+  toolbar.className = "chat-toolbar";
+  toolbar.style.display = "flex";
+  toolbar.style.justifyContent = "flex-start";
+  toolbar.style.alignItems = "center";
+  toolbar.style.gap = "12px";
+  toolbar.style.marginBottom = "8px";
+
+  const attachBtnToolbar = document.createElement("button");
+  attachBtnToolbar.id = "toolbar-attach-btn";
+  attachBtnToolbar.title = "Attach files";
+  attachBtnToolbar.setAttribute("aria-label", "Attach files");
+  attachBtnToolbar.textContent = "📎";
+  attachBtnToolbar.style.cursor = "pointer";
+  attachBtnToolbar.style.fontSize = "1.5rem";
+  attachBtnToolbar.style.padding = "6px 10px";
+  attachBtnToolbar.style.borderRadius = "8px";
+  attachBtnToolbar.style.border = "none";
+  attachBtnToolbar.style.background = "var(--button-bg)";
+  attachBtnToolbar.style.color = "var(--accent-color)";
+  attachBtnToolbar.style.transition = "background-color 0.3s";
+
+  const regenerateBtn = document.createElement("button");
+  regenerateBtn.id = "toolbar-regenerate-btn";
+  regenerateBtn.title = "Regenerate response";
+  regenerateBtn.setAttribute("aria-label", "Regenerate response");
+  regenerateBtn.textContent = "Regenerate";
+  regenerateBtn.style.cursor = "pointer";
+  regenerateBtn.style.fontSize = "1rem";
+  regenerateBtn.style.padding = "6px 12px";
+  regenerateBtn.style.borderRadius = "8px";
+  regenerateBtn.style.border = "none";
+  regenerateBtn.style.background = "var(--button-bg)";
+  regenerateBtn.style.color = "var(--accent-color)";
+  regenerateBtn.style.transition = "background-color 0.3s";
+
+  attachBtnToolbar.addEventListener("mouseenter", () => {
+    attachBtnToolbar.style.backgroundColor = "var(--accent-color)";
+    attachBtnToolbar.style.color = "#000";
+  });
+  attachBtnToolbar.addEventListener("mouseleave", () => {
+    attachBtnToolbar.style.backgroundColor = "var(--button-bg)";
+    attachBtnToolbar.style.color = "var(--accent-color)";
+  });
+  regenerateBtn.addEventListener("mouseenter", () => {
+    regenerateBtn.style.backgroundColor = "var(--accent-color)";
+    regenerateBtn.style.color = "#000";
+  });
+  regenerateBtn.addEventListener("mouseleave", () => {
+    regenerateBtn.style.backgroundColor = "var(--button-bg)";
+    regenerateBtn.style.color = "var(--accent-color)";
+  });
+
+  toolbar.appendChild(attachBtnToolbar);
+  toolbar.appendChild(regenerateBtn);
+
   const input = document.createElement("textarea");
   input.id = "chat-input";
   input.placeholder = "Ask or enter your prompt…";
@@ -302,18 +357,6 @@ async function startChatWithPersonality(key) {
   const sendBtn = document.createElement("button");
   sendBtn.id = "chat-send-btn";
   sendBtn.textContent = "Send";
-
-  const attachBtn = document.createElement("button");
-  attachBtn.id = "attach-btn";
-  attachBtn.title = "Attach files";
-  attachBtn.setAttribute("aria-label", "Attach files");
-  attachBtn.textContent = "📎";
-  attachBtn.style.cursor = "pointer";
-  attachBtn.style.fontSize = "1.25rem";
-  attachBtn.style.border = "none";
-  attachBtn.style.background = "none";
-  attachBtn.style.color = "var(--accent-color)";
-  attachBtn.style.padding = "0 12px";
 
   sendBtn.addEventListener("click", async () => {
     const userInput = input.value.trim();
@@ -362,12 +405,12 @@ async function startChatWithPersonality(key) {
   });
 
   inputRow.appendChild(input);
-  inputRow.appendChild(attachBtn);
-  inputRow.appendChild(sendBtn);
 
   chatPanel.appendChild(chatHeader);
   chatPanel.appendChild(chatHistoryDiv);
+  chatPanel.appendChild(toolbar); // Insert toolbar above input row
   chatPanel.appendChild(inputRow);
+  inputRow.appendChild(sendBtn);
 
   mainContent.appendChild(chatPanel);
   input.focus();

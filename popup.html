@@ -77,12 +77,25 @@
               <!-- Chat messages will be appended here -->
             </div>
             <div class="chat-input-row">
-              <input
-                type="text"
+              <textarea
                 id="chat-input"
                 placeholder="Ask or enter your prompt…"
                 autocomplete="off"
-              />
+                rows="1"
+                style="
+                  resize: none;
+                  overflow: hidden;
+                  width: 100%;
+                  font-size: 1rem;
+                  padding: 14px 20px;
+                  border-radius: 18px;
+                  border: 2.5px solid var(--button-bg);
+                  background: var(--background-color);
+                  color: var(--text-color);
+                  outline-offset: 3px;
+                "
+              ></textarea>
+
               <button id="chat-send-btn">Send</button>
             </div>
           </div>
