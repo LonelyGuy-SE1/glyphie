@@ -31,9 +31,93 @@ const sidebarButtons = document.querySelectorAll("#sidebar .nav-btn");
 const mainContent = document.getElementById("main-content");
 let currentCharKey = null;
 let chatHistory = [];
-let currentChatId = null; // Persist server-side chat_id
+let currentChatId = null;
 
 const BASE_URL = "https://open.service.crestal.network/v1";
+
+// File input for attachments
+const attachmentInput = document.createElement("input");
+attachmentInput.type = "file";
+attachmentInput.accept = "image/*";
+attachmentInput.style.display = "none";
+document.body.appendChild(attachmentInput);
+
+let pendingAttachment = null;
+let pendingAttachmentPreviewUrl = null;
+
+// Trigger input when toolbar-attach-btn is clicked
+document.body.addEventListener("click", function (e) {
+  if (e.target && e.target.id === "toolbar-attach-btn") {
+    attachmentInput.click();
+  }
+});
+
+attachmentInput.onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const apiKey = "563a4706f5001d2baaad744ae59e776d"; // Your imgBB key
+  const formData = new FormData();
+  formData.append("image", file);
+  try {
+    const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+      method: "POST",
+      body: formData,
+    });
+    const result = await res.json();
+    if (result && result.success) {
+      pendingAttachment = [{ type: "image", url: result.data.url }];
+      pendingAttachmentPreviewUrl = result.data.url;
+      renderAttachmentPreview();
+      alert("Image ready to send!");
+    } else {
+      alert("Image upload failed.");
+      pendingAttachment = null;
+      pendingAttachmentPreviewUrl = null;
+      renderAttachmentPreview();
+    }
+  } catch (err) {
+    alert("Upload error");
+    pendingAttachment = null;
+    pendingAttachmentPreviewUrl = null;
+    renderAttachmentPreview();
+  }
+  attachmentInput.value = "";
+};
+
+// Called every time an attachment is added or removed
+function renderAttachmentPreview() {
+  const container = document.getElementById("attachment-preview");
+  if (!container) return;
+
+  container.innerHTML = ""; // Clear previous
+
+  if (pendingAttachmentPreviewUrl) {
+    const chip = document.createElement("div");
+    chip.className = "attachment-chip";
+
+    const img = document.createElement("img");
+    img.src = pendingAttachmentPreviewUrl;
+    img.alt = "Attachment";
+    img.className = "attachment-thumb";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "×";
+    removeBtn.title = "Remove attachment";
+    removeBtn.className = "attachment-remove-btn";
+    removeBtn.onclick = () => {
+      pendingAttachment = null;
+      pendingAttachmentPreviewUrl = null;
+      renderAttachmentPreview();
+    };
+
+    chip.appendChild(img);
+    chip.appendChild(removeBtn);
+    container.appendChild(chip);
+    container.style.display = "flex";
+  } else {
+    container.style.display = "none";
+  }
+}
 
 // === INIT ===
 function init() {
@@ -44,7 +128,6 @@ function init() {
       const section = button.getAttribute("data-section");
       loadSection(section);
 
-      // Auto-close sidebar on selection
       const sidebar = document.getElementById("sidebar");
       const toggleBtn = document.getElementById("sidebar-toggle");
       if (sidebar.classList.contains("open")) {
@@ -53,7 +136,6 @@ function init() {
       }
     });
   });
-
   loadSection("characters");
   applySavedTheme();
 }
@@ -65,13 +147,11 @@ function applySavedTheme() {
   if (toggle) toggle.checked = savedTheme === "light";
 }
 
-// === LOAD SECTIONS ===
 function loadSection(section) {
   mainContent.innerHTML = "";
   currentCharKey = null;
   chatHistory = [];
   currentChatId = null;
-
   if (section === "characters") renderCharacters();
   else if (section === "stats") renderStats();
   else if (section === "settings") renderSettings();
@@ -91,45 +171,35 @@ function renderSnip() {
   mainContent.appendChild(snipClone);
 }
 
-// === RENDER CHARACTERS ===
 function renderCharacters() {
   const container = document.createElement("div");
   container.className = "character-grid";
-
   characters.forEach((char) => {
     const card = document.createElement("div");
     card.className = "character-card";
-
     const img = document.createElement("img");
     img.src = char.image;
     img.alt = `${char.name} avatar`;
     img.className = "character-avatar";
-
     const name = document.createElement("div");
     name.className = "character-name";
     name.textContent = char.name;
-
     const bio = document.createElement("div");
     bio.className = "character-bio";
     bio.textContent = char.bio;
-
     const btn = document.createElement("button");
     btn.className = "select-btn";
     btn.textContent = "Select";
     btn.addEventListener("click", () => startChatWithPersonality(char.key));
-
     card.appendChild(img);
     card.appendChild(name);
     card.appendChild(bio);
     card.appendChild(btn);
-
     container.appendChild(card);
   });
-
   mainContent.appendChild(container);
 }
 
-// === RENDER STATS ===
 function renderStats() {
   const div = document.createElement("div");
   div.className = "placeholder";
@@ -137,45 +207,34 @@ function renderStats() {
   mainContent.appendChild(div);
 }
 
-// === RENDER SETTINGS ===
 function renderSettings() {
   const container = document.createElement("div");
   container.className = "settings-container";
-
   const themeSetting = document.createElement("div");
   themeSetting.className = "setting-item";
-
   const label = document.createElement("label");
   label.htmlFor = "theme-toggle";
   label.textContent = "Dark Mode:";
-
   const toggle = document.createElement("input");
   toggle.type = "checkbox";
   toggle.id = "theme-toggle";
   toggle.checked = !document.body.classList.contains("light");
-
   toggle.addEventListener("change", (e) => {
     const isDarkMode = e.target.checked;
     document.body.classList.toggle("light", !isDarkMode);
     localStorage.setItem("theme", isDarkMode ? "dark" : "light");
   });
-
   themeSetting.appendChild(label);
   themeSetting.appendChild(toggle);
   container.appendChild(themeSetting);
-
   mainContent.appendChild(container);
 }
-
-// IntentKit API helper functions with character-specific API key
 
 async function createChatThread(personaKey) {
   const personaApiKey = characterApiKeys[personaKey];
   if (!personaApiKey) throw new Error("API key for persona not found");
-
   let chatId = localStorage.getItem(`intentkit_chatid_${personaKey}`);
   if (chatId) return chatId;
-
   const response = await fetch(`${BASE_URL}/chats`, {
     method: "POST",
     headers: {
@@ -194,7 +253,6 @@ async function createChatThread(personaKey) {
 async function getChatHistory(chatId, personaKey, limit = 100) {
   const personaApiKey = characterApiKeys[personaKey];
   if (!personaApiKey) throw new Error("API key for persona not found");
-
   const response = await fetch(
     `${BASE_URL}/chats/${chatId}/messages?limit=${limit}`,
     {
@@ -209,21 +267,88 @@ async function getChatHistory(chatId, personaKey, limit = 100) {
   return data.data || [];
 }
 
+// STREAMING and ATTACHMENTS (NO double rendering, clean state!)
 async function sendMessageToThread(chatId, personaKey, message) {
   const personaApiKey = characterApiKeys[personaKey];
   if (!personaApiKey) throw new Error("API key for persona not found");
-
+  const body = { message, stream: true };
+  if (pendingAttachment) body.attachments = pendingAttachment;
   const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${personaApiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error("Failed to send message to agent");
-  const data = await response.json();
-  return data;
+  if (!response.ok) throw new Error("Failed to send (stream) message");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let messageText = "";
+  let bubble = appendStreamingMessage(
+    document.getElementById("chat-history"),
+    "bot",
+    "",
+    null
+  );
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunkStr = decoder.decode(value);
+    try {
+      for (const line of chunkStr.trim().split("\n")) {
+        if (!line.trim()) continue;
+        const obj = JSON.parse(line);
+        if (obj.message !== undefined) {
+          messageText += obj.message;
+          if (bubble)
+            bubble.querySelector(".msg-content").textContent = messageText;
+        }
+      }
+    } catch (e) {
+      if (bubble) bubble.querySelector(".msg-content").textContent = chunkStr;
+    }
+  }
+  let ts = new Date().toISOString();
+  if (bubble) {
+    setMessageTimestamp(bubble, ts);
+    bubble.classList.remove("typing");
+  }
+  chatHistory.push({ role: "assistant", content: messageText, created_at: ts });
+  pendingAttachment = null;
+  pendingAttachmentPreviewUrl = null;
+  renderAttachmentPreview();
+  return messageText;
+}
+
+function appendStreamingMessage(container, sender, text, timestamp) {
+  const msg = document.createElement("div");
+  msg.className = `message ${sender} typing`;
+  const content = document.createElement("div");
+  content.className = "msg-content";
+  content.textContent = text;
+  msg.appendChild(content);
+  if (timestamp) setMessageTimestamp(msg, timestamp);
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+  return msg;
+}
+
+function setMessageTimestamp(msg, timestamp) {
+  let el = msg.querySelector(".msg-time");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "msg-time";
+    msg.appendChild(el);
+  }
+  const dateObj = new Date(timestamp);
+  el.textContent = dateObj.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 async function startChatWithPersonality(key) {
@@ -233,25 +358,20 @@ async function startChatWithPersonality(key) {
 
   const chatPanel = document.createElement("div");
   chatPanel.className = "chat-panel";
-
   const chatHeader = document.createElement("div");
   chatHeader.className = "chat-header";
-
   const persona = characters.find((c) => c.key === key);
   if (!persona) {
     mainContent.textContent = "Persona not found.";
     return;
   }
-
   const avatar = document.createElement("img");
   avatar.className = "chat-avatar";
   avatar.src = persona.image;
   avatar.alt = `${persona.name} avatar`;
-
   const nameSpan = document.createElement("span");
   nameSpan.className = "chat-name";
   nameSpan.textContent = persona.name;
-
   chatHeader.appendChild(avatar);
   chatHeader.appendChild(nameSpan);
 
@@ -264,7 +384,6 @@ async function startChatWithPersonality(key) {
   try {
     currentChatId = await createChatThread(key);
     chatHistory = await getChatHistory(currentChatId, key);
-    // Append messages oldest first
     chatHistory
       .slice()
       .reverse()
@@ -275,9 +394,8 @@ async function startChatWithPersonality(key) {
             msg.author_type.toLowerCase() === "user")
             ? "user"
             : "bot";
-        appendMessage(chatHistoryDiv, author, msg.message);
+        appendMessage(chatHistoryDiv, author, msg.message, msg.created_at);
       });
-    // Ensure chat scrolls fully to the latest after DOM updates
     setTimeout(() => {
       chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
     }, 0);
@@ -291,7 +409,17 @@ async function startChatWithPersonality(key) {
   const inputRow = document.createElement("div");
   inputRow.className = "chat-input-row";
 
-  // Toolbar above input for attachment and regenerate buttons
+  // Attachment preview bar
+  const attachmentPreviewBar = document.createElement("div");
+  attachmentPreviewBar.id = "attachment-preview";
+  attachmentPreviewBar.className = "attachment-preview-bar";
+  attachmentPreviewBar.style.display = "none";
+  attachmentPreviewBar.style.flexDirection = "row";
+  attachmentPreviewBar.style.alignItems = "center";
+  attachmentPreviewBar.style.margin = "6px 0";
+  inputRow.appendChild(attachmentPreviewBar);
+
+  // Toolbar above input with attach and regenerate buttons
   const toolbar = document.createElement("div");
   toolbar.className = "chat-toolbar";
   toolbar.style.display = "flex";
@@ -299,7 +427,6 @@ async function startChatWithPersonality(key) {
   toolbar.style.alignItems = "center";
   toolbar.style.gap = "12px";
   toolbar.style.marginBottom = "8px";
-
   const attachBtnToolbar = document.createElement("button");
   attachBtnToolbar.id = "toolbar-attach-btn";
   attachBtnToolbar.title = "Attach files";
@@ -313,7 +440,6 @@ async function startChatWithPersonality(key) {
   attachBtnToolbar.style.background = "var(--button-bg)";
   attachBtnToolbar.style.color = "var(--accent-color)";
   attachBtnToolbar.style.transition = "background-color 0.3s";
-
   const regenerateBtn = document.createElement("button");
   regenerateBtn.id = "toolbar-regenerate-btn";
   regenerateBtn.title = "Regenerate response";
@@ -327,24 +453,6 @@ async function startChatWithPersonality(key) {
   regenerateBtn.style.background = "var(--button-bg)";
   regenerateBtn.style.color = "var(--accent-color)";
   regenerateBtn.style.transition = "background-color 0.3s";
-
-  attachBtnToolbar.addEventListener("mouseenter", () => {
-    attachBtnToolbar.style.backgroundColor = "var(--accent-color)";
-    attachBtnToolbar.style.color = "#000";
-  });
-  attachBtnToolbar.addEventListener("mouseleave", () => {
-    attachBtnToolbar.style.backgroundColor = "var(--button-bg)";
-    attachBtnToolbar.style.color = "var(--accent-color)";
-  });
-  regenerateBtn.addEventListener("mouseenter", () => {
-    regenerateBtn.style.backgroundColor = "var(--accent-color)";
-    regenerateBtn.style.color = "#000";
-  });
-  regenerateBtn.addEventListener("mouseleave", () => {
-    regenerateBtn.style.backgroundColor = "var(--button-bg)";
-    regenerateBtn.style.color = "var(--accent-color)";
-  });
-
   toolbar.appendChild(attachBtnToolbar);
   toolbar.appendChild(regenerateBtn);
 
@@ -362,7 +470,6 @@ async function startChatWithPersonality(key) {
   input.style.background = "var(--background-color)";
   input.style.color = "var(--text-color)";
   input.style.outlineOffset = "3px";
-
   input.addEventListener("input", () => {
     input.style.height = "auto";
     input.style.height = input.scrollHeight + "px";
@@ -374,40 +481,26 @@ async function startChatWithPersonality(key) {
 
   sendBtn.addEventListener("click", async () => {
     const userInput = input.value.trim();
-    if (!userInput) return;
-
-    appendMessage(chatHistoryDiv, "user", userInput);
-    chatHistory.push({ role: "user", content: userInput });
-
+    if (!userInput && !pendingAttachment) return;
+    const now = new Date().toISOString();
+    appendMessage(chatHistoryDiv, "user", userInput, now);
+    chatHistory.push({ role: "user", content: userInput, created_at: now });
     input.value = "";
     input.style.height = "auto";
     setLoadingState(true, sendBtn);
 
     try {
-      const agentReplies = await sendMessageToThread(
-        currentChatId,
-        key,
-        userInput
-      );
-
-      if (Array.isArray(agentReplies)) {
-        agentReplies.forEach((msgObj) => {
-          appendMessage(chatHistoryDiv, "bot", msgObj.message);
-          chatHistory.push({ role: "assistant", content: msgObj.message });
-        });
-      } else {
-        appendMessage(chatHistoryDiv, "bot", "No reply from agent.");
-      }
+      await sendMessageToThread(currentChatId, key, userInput);
       chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
     } catch (error) {
       appendMessage(
         chatHistoryDiv,
         "bot",
-        "Error: Unable to get reply. Try again."
+        "Error: Unable to get reply. Try again.",
+        new Date().toISOString()
       );
       console.error(error);
     }
-
     setLoadingState(false, sendBtn);
   });
 
@@ -422,21 +515,38 @@ async function startChatWithPersonality(key) {
 
   chatPanel.appendChild(chatHeader);
   chatPanel.appendChild(chatHistoryDiv);
-  chatPanel.appendChild(toolbar); // Insert toolbar above input row
+  chatPanel.appendChild(toolbar);
   chatPanel.appendChild(inputRow);
   inputRow.appendChild(sendBtn);
 
   mainContent.appendChild(chatPanel);
+  renderAttachmentPreview();
   input.focus();
 }
 
-function appendMessage(container, sender, text) {
+// Append message with support for timestamp and only the message text
+function appendMessage(container, sender, text, timestamp, isError) {
   const msg = document.createElement("div");
-  msg.className = `message ${sender}`;
-  msg.textContent = text;
-  container.appendChild(msg);
+  msg.className = `message ${sender}` + (isError ? " error" : "");
+  const content = document.createElement("div");
+  content.className = "msg-content";
+  content.textContent = text;
+  msg.appendChild(content);
 
-  container.scrollTop = container.scrollHeight; // Auto-scroll on new message
+  if (timestamp) {
+    const timeDiv = document.createElement("div");
+    timeDiv.className = "msg-time";
+    const dateObj = new Date(timestamp);
+    timeDiv.textContent = dateObj.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    msg.appendChild(timeDiv);
+  }
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
 }
 
 function setLoadingState(isLoading, sendBtn) {
@@ -452,10 +562,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const sidebar = document.getElementById("sidebar");
   const toggleBtn = document.getElementById("sidebar-toggle");
   const overlay = document.getElementById("main-content-overlay");
-
   sidebar.classList.remove("open");
   toggleBtn.textContent = "☰";
-
   toggleBtn.addEventListener("click", () => {
     if (sidebar.classList.contains("open")) {
       sidebar.classList.remove("open");
@@ -465,7 +573,6 @@ document.addEventListener("DOMContentLoaded", function () {
       toggleBtn.textContent = "✖";
     }
   });
-
   overlay.addEventListener("click", () => {
     sidebar.classList.remove("open");
     toggleBtn.textContent = "☰";
@@ -478,7 +585,6 @@ document.addEventListener("DOMContentLoaded", function () {
   let isDragging = false;
   let offsetX = 0,
     offsetY = 0;
-
   const savedLeft = localStorage.getItem("sidebarToggleLeft");
   const savedTop = localStorage.getItem("sidebarToggleTop");
   if (savedLeft && savedTop) {
@@ -490,7 +596,6 @@ document.addEventListener("DOMContentLoaded", function () {
     toggleBtn.style.top = "10px";
     toggleBtn.style.right = "10px";
   }
-
   toggleBtn.addEventListener("mousedown", function (e) {
     isDragging = true;
     offsetX = e.clientX - toggleBtn.offsetLeft;
@@ -498,33 +603,25 @@ document.addEventListener("DOMContentLoaded", function () {
     toggleBtn.style.transition = "none";
     toggleBtn.style.right = "auto";
   });
-
   document.addEventListener("mousemove", function (e) {
     if (!isDragging) return;
-
     let x = e.clientX - offsetX;
     let y = e.clientY - offsetY;
-
     const contRect = container.getBoundingClientRect();
     const btnRect = toggleBtn.getBoundingClientRect();
-
     x = Math.max(0, Math.min(x, contRect.width - btnRect.width));
     y = Math.max(0, Math.min(y, contRect.height - btnRect.height));
-
     toggleBtn.style.left = x + "px";
     toggleBtn.style.top = y + "px";
   });
-
   document.addEventListener("mouseup", function () {
     if (isDragging) {
       isDragging = false;
       toggleBtn.style.transition = "";
-
       localStorage.setItem("sidebarToggleLeft", toggleBtn.style.left);
       localStorage.setItem("sidebarToggleTop", toggleBtn.style.top);
     }
   });
 });
 
-// === INIT ON LOAD ===
 document.addEventListener("DOMContentLoaded", init);
