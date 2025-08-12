@@ -730,14 +730,31 @@ function setupSnipEventListeners(snipContainer) {
     snipBtn.addEventListener("click", handleSnipAction);
   }
 
+  // Update the send button listener in setupSnipEventListeners
   if (snipSendBtn) {
-    snipSendBtn.addEventListener("click", () => {
+    snipSendBtn.addEventListener("click", async () => {
       const message = snipInput?.value.trim();
       if (selectedSnips.length > 0 || message) {
-        handleSnipSend(snipChatHistory, message);
+        // Show loading state
+        snipSendBtn.textContent = "Sending...";
+        snipSendBtn.disabled = true;
+
+        console.log(
+          "📤 Starting send with:",
+          selectedSnips.length,
+          "images and message:",
+          message
+        );
+
+        await handleSnipSend(snipChatHistory, message);
+
+        // Reset UI
         if (snipInput) snipInput.value = "";
         selectedSnips = [];
         updateGallery(snipContainer);
+
+        snipSendBtn.textContent = "Send";
+        snipSendBtn.disabled = false;
       } else {
         alert("Please select at least one snip or add a message!");
       }
@@ -874,8 +891,10 @@ function updateGallery(container) {
   console.log("✅ Gallery updated successfully");
 }
 
-// Handle sending with Crestal API integration
+// UPDATED handleSnipSend - Send images to Crestal API
 async function handleSnipSend(chatHistoryDiv, message) {
+  console.log("📤 SENDING SNIPS:", selectedSnips.length, "selected");
+
   if (selectedSnips.length === 0 && !message) {
     appendSnipMessage(
       chatHistoryDiv,
@@ -893,7 +912,7 @@ async function handleSnipSend(chatHistoryDiv, message) {
     appendSnipMessage(chatHistoryDiv, "user", message, timestamp);
   }
 
-  // Add selected snips
+  // Add selected snips to chat display
   selectedSnips.forEach((snipId) => {
     const snip = storedSnips.find((s) => s.id === snipId);
     if (snip) {
@@ -901,21 +920,69 @@ async function handleSnipSend(chatHistoryDiv, message) {
     }
   });
 
-  // Send to Crestal API (using white agent for snips)
+  // UPLOAD SELECTED IMAGES TO IMGBB FOR API
+  console.log(
+    "📤 Uploading",
+    selectedSnips.length,
+    "images to imgbb for API..."
+  );
+  const uploadedImages = [];
+
   try {
-    const snipTexts = selectedSnips.map((snipId) => {
+    for (const snipId of selectedSnips) {
       const snip = storedSnips.find((s) => s.id === snipId);
-      return `[Image: ${snip.dimensions.width}×${
+      if (snip) {
+        console.log("📤 Uploading snip:", snip.id);
+
+        // Convert base64 to blob
+        const base64Response = await fetch(snip.data);
+        const blob = await base64Response.blob();
+
+        // Upload to imgbb
+        const formData = new FormData();
+        formData.append("image", blob);
+
+        const imgbbResponse = await fetch(
+          "https://api.imgbb.com/1/upload?key=563a4706f5001d2baaad744ae59e776d",
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+        const imgbbResult = await imgbbResponse.json();
+
+        if (imgbbResult.success) {
+          uploadedImages.push({
+            type: "image",
+            url: imgbbResult.data.url,
+          });
+          console.log("✅ Uploaded snip to:", imgbbResult.data.url);
+        } else {
+          console.error("❌ Failed to upload snip:", imgbbResult);
+        }
+      }
+    }
+
+    console.log("📤 Successfully uploaded", uploadedImages.length, "images");
+
+    // Create text description of images
+    const imageDescriptions = selectedSnips.map((snipId, index) => {
+      const snip = storedSnips.find((s) => s.id === snipId);
+      return `Image ${index + 1}: Screenshot (${snip.dimensions.width}×${
         snip.dimensions.height
-      }px snip from ${new Date(snip.timestamp).toLocaleString()}]`;
+      }px) captured on ${new Date(snip.timestamp).toLocaleString()}`;
     });
 
     const fullMessage = [
-      message || "Please analyze these snipped images:",
-      ...snipTexts,
+      message || "Please analyze these images:",
+      ...imageDescriptions,
     ].join("\n\n");
 
-    // Use the white character API for snip analysis
+    console.log("📤 Sending to API with message:", fullMessage);
+    console.log("📤 Attachments:", uploadedImages);
+
+    // Send to Crestal API
     const apiKey = characterApiKeys.white;
     let chatId = localStorage.getItem(`intentkit_chatid_snip`);
 
@@ -931,6 +998,7 @@ async function handleSnipSend(chatHistoryDiv, message) {
       },
       body: JSON.stringify({
         message: fullMessage,
+        attachments: uploadedImages, // Send the uploaded images
         stream: true,
       }),
     });
@@ -966,15 +1034,17 @@ async function handleSnipSend(chatHistoryDiv, message) {
         setMessageTimestamp(bubble, new Date().toISOString());
         bubble.classList.remove("typing");
       }
+
+      console.log("✅ API response completed");
     } else {
-      throw new Error("API request failed");
+      throw new Error(`API request failed: ${response.status}`);
     }
   } catch (error) {
-    console.error("Snip send error:", error);
+    console.error("❌ Send error:", error);
     appendSnipMessage(
       chatHistoryDiv,
       "bot",
-      "Sorry, I couldn't process your snips right now. Please try again later.",
+      `Sorry, I couldn't process your snips: ${error.message}`,
       new Date().toISOString(),
       true
     );
@@ -1002,7 +1072,7 @@ async function createSnipChatThread() {
   return chatId;
 }
 
-// UPDATED appendSnipImageMessage - Use imgbb URLs
+// UPDATED appendSnipImageMessage - Use base64 data
 function appendSnipImageMessage(container, snipData, timestamp) {
   const msg = document.createElement("div");
   msg.className = "message snip";
@@ -1011,16 +1081,26 @@ function appendSnipImageMessage(container, snipData, timestamp) {
   content.className = "msg-content";
 
   const img = document.createElement("img");
-  img.src = snipData.url; // Use imgbb URL
+  img.src = snipData.data; // Use base64 data directly
   img.className = "snip-image";
   img.alt = "Snipped image";
-  img.style.maxWidth = "300px";
-  img.style.maxHeight = "200px";
-  img.style.objectFit = "contain";
-  img.onclick = () => showImageModal(snipData.url);
+  img.style.cssText = `
+    max-width: 300px; 
+    max-height: 200px; 
+    object-fit: contain; 
+    border-radius: 8px; 
+    border: 2px solid var(--accent-color);
+  `;
+  img.onclick = () => showImageModal(snipData.data);
 
   const caption = document.createElement("div");
   caption.className = "snip-caption";
+  caption.style.cssText = `
+    text-align: center; 
+    margin-top: 8px; 
+    font-size: 12px; 
+    color: var(--accent-color);
+  `;
   caption.textContent = `✂️ Snip (${snipData.dimensions.width}×${snipData.dimensions.height}px)`;
 
   content.appendChild(img);
