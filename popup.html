@@ -66,6 +66,96 @@
             <span class="label">Usage</span>
           </button>
         </nav>
+        <!-- Characters Section -->
+        <section
+          id="characters-section"
+          class="content-section"
+          aria-label="Characters"
+        ></section>
+
+        <!-- Snip Section -->
+        <section
+          id="snip-section"
+          class="content-section hidden"
+          aria-label="Snip Tool"
+        >
+          <div class="chat-panel">
+            <div class="chat-header" aria-label="Snip mode header">
+              <span>Snip Mode ✂️</span>
+            </div>
+            <div style="padding: 10px; background: #333; margin: 5px">
+              <button
+                id="debug-clear-snips"
+                style="background: red; color: white; padding: 8px; margin: 3px"
+              >
+                🗑️ Clear All Snips
+              </button>
+              <button
+                id="debug-show-snips"
+                style="
+                  background: blue;
+                  color: white;
+                  padding: 8px;
+                  margin: 3px;
+                "
+              >
+                📊 Show Storage Info
+              </button>
+              <button
+                id="debug-refresh-gallery"
+                style="
+                  background: green;
+                  color: white;
+                  padding: 8px;
+                  margin: 3px;
+                "
+              >
+                🔄 Force Refresh Gallery
+              </button>
+            </div>
+
+            <div id="snip-chat-history" class="chat-history"></div>
+            <div class="chat-input-row">
+              <button id="snip-btn" title="Start a new snip" type="button">
+                Snip ✂️
+              </button>
+              <input
+                id="snip-chat-input"
+                type="text"
+                placeholder="Add a message (optional)..."
+                autocomplete="off"
+                aria-label="Add a message (optional)"
+              />
+              <button id="snip-send-btn" type="button">Send</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section
+          id="stats-section"
+          class="content-section hidden"
+          aria-label="Usage Stats"
+        ></section>
+
+        <!-- Settings Section -->
+        <section
+          id="settings-section"
+          class="content-section hidden"
+          aria-label="Settings"
+        >
+          <h2>Settings panel coming soon!</h2>
+          <div class="appearance-section">
+            <h3>Appearance</h3>
+            <div class="setting-item">
+              <label class="toggle-label" for="toggle-theme"
+                >🌗 Dark Mode:</label
+              >
+              <input id="toggle-theme" class="toggle-input" type="checkbox" />
+              <span class="custom-slider"></span>
+            </div>
+          </div>
+        </section>
 
         <!-- Main Content Area -->
         <main
@@ -75,66 +165,6 @@
           aria-relevant="additions removals"
           tabindex="0"
         >
-          <!-- Characters Section -->
-          <section
-            id="characters-section"
-            class="content-section"
-            aria-label="Characters"
-          ></section>
-
-          <!-- Snip Section -->
-          <section
-            id="snip-section"
-            class="content-section hidden"
-            aria-label="Snip Tool"
-          >
-            <div class="chat-panel">
-              <div class="chat-header" aria-label="Snip mode header">
-                <span>Snip Mode ✂️</span>
-              </div>
-              <div id="snip-chat-history" class="chat-history"></div>
-              <div class="chat-input-row">
-                <button id="snip-btn" title="Start a new snip" type="button">
-                  Snip ✂️
-                </button>
-                <input
-                  id="snip-chat-input"
-                  type="text"
-                  placeholder="Add a message (optional)..."
-                  autocomplete="off"
-                  aria-label="Add a message (optional)"
-                />
-                <button id="snip-send-btn" type="button">Send</button>
-              </div>
-            </div>
-          </section>
-
-          <!-- Stats Section -->
-          <section
-            id="stats-section"
-            class="content-section hidden"
-            aria-label="Usage Stats"
-          ></section>
-
-          <!-- Settings Section -->
-          <section
-            id="settings-section"
-            class="content-section hidden"
-            aria-label="Settings"
-          >
-            <h2>Settings panel coming soon!</h2>
-            <div class="appearance-section">
-              <h3>Appearance</h3>
-              <div class="setting-item">
-                <label class="toggle-label" for="toggle-theme"
-                  >🌗 Dark Mode:</label
-                >
-                <input id="toggle-theme" class="toggle-input" type="checkbox" />
-                <span class="custom-slider"></span>
-              </div>
-            </div>
-          </section>
-
           <!-- Active Chat Panel -->
           <div class="chat-panel" aria-label="Active chat panel">
             <div class="chat-header" aria-label="Chat header" role="banner">

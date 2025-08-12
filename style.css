@@ -753,3 +753,454 @@ body.light .theme-label {
   border: 2px dashed #00ffaa;
   background-color: rgba(0, 255, 170, 0.1);
 }
+
+.hidden {
+  display: none !important;
+}
+/* === SNIP OVERLAY STYLES === */
+#snip-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(0, 0, 0, 0.3) !important;
+  z-index: 999999 !important;
+  cursor: crosshair !important;
+}
+
+.snip-instructions {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 12px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 2px solid var(--accent-color);
+}
+
+.snip-text {
+  font-weight: 600;
+  color: var(--accent-color);
+}
+
+.snip-cancel {
+  background: #ff4444 !important;
+  color: white !important;
+  border: none !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+}
+
+.snip-cancel:hover {
+  background: #ff6666 !important;
+}
+
+.snip-selection-box {
+  position: absolute;
+  border: 3px dashed var(--accent-color);
+  background: rgba(187, 255, 0, 0.1);
+  display: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+/* === SNIP CHAT STYLES === */
+.message.snip {
+  background: rgb(187, 255, 0);
+  color: #000;
+  border: 2px solid #fff;
+  font-weight: 600;
+  max-width: 95%;
+}
+
+.message.system {
+  background: #333;
+  color: #ccc;
+  border: 2px solid #555;
+  font-style: italic;
+  max-width: 90%;
+  margin: 0 auto;
+}
+
+.snip-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.snip-image:hover {
+  transform: scale(1.02);
+}
+
+.snip-caption {
+  margin-top: 8px;
+  font-size: 0.9em;
+  font-weight: 600;
+  text-align: center;
+  color: #000;
+}
+
+/* === SNIP BUTTON STYLES === */
+#snip-btn,
+#active-snip-btn {
+  background: rgb(187, 255, 0);
+  color: #000 !important;
+  border: none !important;
+  padding: 12px 20px !important;
+  border-radius: 16px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  font-size: 1.1em !important;
+  box-shadow: 0 4px 15px rgba(187, 255, 0, 0.3) !important;
+}
+
+#snip-btn:hover,
+#active-snip-btn:hover {
+  background: linear-gradient(135deg, #fff, #f0f0f0) !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 6px 20px rgba(187, 255, 0, 0.5) !important;
+}
+
+/* === SNIP IMAGE MODAL === */
+.snip-image-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.9);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.snip-modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  background: var(--background-color);
+  border-radius: 12px;
+  padding: 20px;
+  border: 2px solid var(--accent-color);
+}
+
+.snip-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  font-size: 24px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.snip-modal-image {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 8px;
+  display: block;
+}
+
+/* === SNIP SECTION ENHANCEMENTS === */
+#snip-section .chat-panel {
+  border: 2px solid var(--accent-color);
+  box-shadow: 0 0 20px rgba(187, 255, 0, 0.2);
+}
+
+#snip-section .chat-header {
+  background: rgb(187, 255, 0);
+  color: #000;
+  font-weight: bold;
+  border-radius: 12px 12px 0 0;
+}
+
+#snip-section .chat-input-row {
+  background: linear-gradient(
+    45deg,
+    rgba(187, 255, 0, 0.1),
+    rgba(0, 255, 136, 0.1)
+  );
+  padding: 20px;
+  border-radius: 0 0 12px 12px;
+}
+/* === SNIP SECTION SPECIFIC STYLES === */
+#snip-section .chat-panel,
+#active-snip-section .chat-panel {
+  border: 3px solid var(--accent-color);
+  box-shadow: 0 0 25px rgba(187, 255, 0, 0.3);
+  background: var(--background-alt);
+}
+
+#snip-section .chat-header,
+#active-snip-section .chat-header {
+  background: rgb(187, 255, 0);
+  color: #000 !important;
+  font-weight: bold;
+  border-radius: 15px 15px 0 0;
+  text-align: center;
+  font-size: 1.2em;
+  padding: 15px;
+}
+
+#snip-section .chat-input-row,
+#active-snip-section .chat-input-row {
+  background: linear-gradient(
+    45deg,
+    rgba(187, 255, 0, 0.1),
+    rgba(0, 255, 136, 0.1)
+  );
+  padding: 20px;
+  border-radius: 0 0 15px 15px;
+  border-top: 2px solid var(--accent-color);
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+/* Snip input styling */
+#snip-chat-input,
+#active-snip-input {
+  flex: 1;
+  background: #000 !important;
+  color: var(--accent-color) !important;
+  border: 3px solid var(--accent-color) !important;
+  border-radius: 16px !important;
+  padding: 14px 20px !important;
+  font-size: 1rem !important;
+  font-family: "Inter", sans-serif !important;
+  outline: none !important;
+  transition: all 0.3s ease !important;
+}
+
+#snip-chat-input:focus,
+#active-snip-input:focus {
+  border-color: #fff !important;
+  box-shadow: 0 0 15px rgba(187, 255, 0, 0.5) !important;
+  background: #111 !important;
+}
+
+#snip-chat-input::placeholder,
+#active-snip-input::placeholder {
+  color: rgba(187, 255, 0, 0.7) !important;
+}
+
+/* Snip send button styling */
+#snip-send-btn,
+#active-snip-send-btn {
+  background: rgb(187, 255, 0) !important;
+  color: #000 !important;
+  border: none !important;
+  padding: 14px 25px !important;
+  border-radius: 16px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  font-size: 1rem !important;
+  min-width: 80px;
+}
+
+#snip-send-btn:hover,
+#active-snip-send-btn:hover {
+  background: linear-gradient(135deg, #fff, #f0f0f0) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 5px 20px rgba(187, 255, 0, 0.4) !important;
+}
+
+/* === SNIP GALLERY STYLES === */
+.snip-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  padding: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  margin: 15px 20px;
+  border: 2px solid var(--accent-color);
+}
+
+.snip-item {
+  position: relative;
+  border: 2px solid var(--accent-color);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: #000;
+}
+
+.snip-item:hover {
+  transform: scale(1.05);
+  box-shadow: 0 5px 20px rgba(187, 255, 0, 0.6);
+}
+
+.snip-item.selected {
+  border-color: #fff;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+}
+
+.snip-thumbnail {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  display: block;
+}
+
+.snip-info {
+  padding: 8px;
+  background: rgba(187, 255, 0, 0.9);
+  color: #000;
+  font-size: 0.8em;
+  text-align: center;
+  font-weight: bold;
+}
+
+.snip-remove {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: #ff4444;
+  color: white;
+  border: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.snip-item:hover .snip-remove {
+  opacity: 1;
+}
+
+/* === SNIP OVERLAY STYLES (Enhanced) === */
+#snip-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(0, 0, 0, 0.4) !important;
+  z-index: 999999 !important;
+  cursor: crosshair !important;
+  font-family: "Inter", sans-serif !important;
+}
+
+.snip-instructions {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.95);
+  color: white;
+  padding: 15px 30px;
+  border-radius: 15px;
+  display: flex;
+  gap: 25px;
+  align-items: center;
+  font-size: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  border: 3px solid #bbff00;
+  animation: snipPulse 2s infinite ease-in-out;
+}
+
+@keyframes snipPulse {
+  0%,
+  100% {
+    box-shadow: 0 8px 32px rgba(187, 255, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(187, 255, 0, 0.8);
+  }
+}
+
+.snip-text {
+  font-weight: 700;
+  color: #bbff00;
+  text-shadow: 0 0 10px rgba(187, 255, 0, 0.5);
+}
+
+.snip-cancel {
+  background: linear-gradient(135deg, #ff4444, #ff6666) !important;
+  color: white !important;
+  border: none !important;
+  padding: 10px 20px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 68, 68, 0.4);
+}
+
+.snip-cancel:hover {
+  background: linear-gradient(135deg, #ff6666, #ff8888) !important;
+  transform: translateY(-2px);
+}
+
+.snip-selection-box {
+  position: absolute;
+  border: 4px dashed #bbff00;
+  background: rgba(187, 255, 0, 0.15);
+  display: none;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8),
+    inset 0 0 50px rgba(187, 255, 0, 0.2);
+  animation: snipSelection 1s infinite ease-in-out;
+}
+
+@keyframes snipSelection {
+  0%,
+  100% {
+    border-color: #bbff00;
+  }
+  50% {
+    border-color: #00ff88;
+  }
+}
+
+.snip-selection-box::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  border: 2px solid rgba(187, 255, 0, 0.6);
+  border-radius: 8px;
+  animation: snipGlow 2s infinite ease-in-out;
+}
+
+@keyframes snipGlow {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
