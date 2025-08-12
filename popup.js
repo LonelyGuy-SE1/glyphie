@@ -66,9 +66,9 @@ function saveSnips() {
   localStorage.setItem("glyphie-snips", JSON.stringify(storedSnips));
 }
 
-// SIMPLIFIED - Keep popup open for debugging
+// ROBUST handleSnipAction - Add delays for stability
 async function handleSnipAction() {
-  console.log("🔍 Starting snip action - DEBUG MODE");
+  console.log("🔍 Starting snip action - ROBUST VERSION");
 
   try {
     const [tab] = await chrome.tabs.query({
@@ -83,28 +83,44 @@ async function handleSnipAction() {
 
     console.log("🔍 Injecting script into tab:", tab.id);
 
-    // Inject script
+    // Inject script with delay
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: injectFullSnipScript,
     });
 
-    // Send start message - KEEP POPUP OPEN
-    chrome.tabs.sendMessage(tab.id, { type: "START_SNIP" }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error("❌ Message failed:", chrome.runtime.lastError.message);
-      } else {
-        console.log("✅ Snip started:", response);
-        // DON'T close popup - just update UI
-        const snipBtn =
-          document.getElementById("active-snip-btn") ||
-          document.querySelector("#snip-btn");
-        if (snipBtn) {
-          snipBtn.textContent = "Snipping... (check webpage)";
-          snipBtn.style.background = "orange";
+    // Wait a bit for injection to complete
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    console.log("✅ Script injected, sending message...");
+
+    // Send start message with retry logic
+    let retryCount = 0;
+    const sendMessage = () => {
+      chrome.tabs.sendMessage(tab.id, { type: "START_SNIP" }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("❌ Message failed:", chrome.runtime.lastError.message);
+          if (retryCount < 3) {
+            retryCount++;
+            console.log(`🔄 Retrying message (attempt ${retryCount})...`);
+            setTimeout(sendMessage, 500);
+          } else {
+            alert("Failed to start snipping after multiple attempts");
+          }
+        } else {
+          console.log("✅ Snip started:", response);
+          const snipBtn =
+            document.getElementById("active-snip-btn") ||
+            document.querySelector("#snip-btn");
+          if (snipBtn) {
+            snipBtn.textContent = "Snipping... (check webpage)";
+            snipBtn.style.background = "orange";
+          }
         }
-      }
-    });
+      });
+    };
+
+    sendMessage();
   } catch (error) {
     console.error("❌ Error:", error);
     alert("Error: " + error.message);
@@ -383,11 +399,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true; // Keep channel open for async response
 });
 
-// SIMPLIFIED captureScreenshotArea - localStorage only for now
+// ROBUST captureScreenshotArea - Add delays and error handling
 async function captureScreenshotArea(coordinates) {
-  console.log("📸 SIMPLE CAPTURE: Starting with coordinates:", coordinates);
+  console.log("📸 ROBUST CAPTURE: Starting with coordinates:", coordinates);
 
   try {
+    // Add delay for stability
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     // Get tab
     const [tab] = await chrome.tabs.query({
       active: true,
@@ -395,21 +414,23 @@ async function captureScreenshotArea(coordinates) {
     });
     console.log("📸 Got tab:", tab.id);
 
-    // Capture screenshot
+    // Capture screenshot with delay
+    await new Promise((resolve) => setTimeout(resolve, 200));
     const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
       format: "png",
       quality: 100,
     });
     console.log("📸 Screenshot captured, length:", dataUrl.length);
 
-    // Crop image
+    // Crop image with delay
+    await new Promise((resolve) => setTimeout(resolve, 100));
     const croppedImage = await cropImage(dataUrl, coordinates);
     console.log("📸 Image cropped, length:", croppedImage.length);
 
-    // Create simple snip data - STORE BASE64 FOR NOW
+    // Create snip data
     const snipData = {
       id: Date.now(),
-      data: croppedImage, // Store base64 directly for now
+      data: croppedImage,
       timestamp: new Date().toISOString(),
       dimensions: {
         width: Math.round(coordinates.width),
@@ -418,45 +439,73 @@ async function captureScreenshotArea(coordinates) {
       pageUrl: tab.url,
     };
 
-    console.log("📸 Created snip data:", {
-      id: snipData.id,
-      dataLength: snipData.data.length,
-      dimensions: snipData.dimensions,
-    });
+    console.log("📸 Created snip data with ID:", snipData.id);
 
-    // Save to localStorage
-    const saved = localStorage.getItem("glyphie-snips");
-    const existingSnips = saved ? JSON.parse(saved) : [];
-    existingSnips.push(snipData);
+    // Save to localStorage with retry
+    let saveSuccess = false;
+    let saveAttempts = 0;
 
-    localStorage.setItem("glyphie-snips", JSON.stringify(existingSnips));
-    storedSnips = existingSnips;
+    while (!saveSuccess && saveAttempts < 3) {
+      try {
+        const saved = localStorage.getItem("glyphie-snips");
+        const existingSnips = saved ? JSON.parse(saved) : [];
+        existingSnips.push(snipData);
 
-    console.log("📸 SAVED TO STORAGE! Total snips:", existingSnips.length);
+        localStorage.setItem("glyphie-snips", JSON.stringify(existingSnips));
 
-    // Reset button
-    const snipBtn =
-      document.getElementById("active-snip-btn") ||
-      document.querySelector("#snip-btn");
-    if (snipBtn) {
-      snipBtn.textContent = "✅ Captured! Check gallery";
-      snipBtn.style.background = "green";
-      setTimeout(() => {
-        snipBtn.textContent = "Snip ✂️";
-        snipBtn.style.background = "";
-      }, 2000);
+        // Verify save
+        const verification = localStorage.getItem("glyphie-snips");
+        const verifySnips = verification ? JSON.parse(verification) : [];
+
+        if (verifySnips.find((s) => s.id === snipData.id)) {
+          saveSuccess = true;
+          storedSnips = verifySnips;
+          console.log("📸 SAVED TO STORAGE! Total snips:", verifySnips.length);
+        } else {
+          throw new Error("Verification failed");
+        }
+      } catch (error) {
+        saveAttempts++;
+        console.warn(`⚠️ Save attempt ${saveAttempts} failed:`, error);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
     }
 
-    // FORCE REFRESH GALLERY
-    const activeSection = document.getElementById("active-snip-section");
-    if (activeSection) {
-      console.log("📸 Forcing gallery refresh...");
-      setTimeout(() => updateGallery(activeSection), 500);
+    if (!saveSuccess) {
+      throw new Error("Failed to save to localStorage after multiple attempts");
     }
+
+    // Update UI with delay
+    setTimeout(() => {
+      const snipBtn =
+        document.getElementById("active-snip-btn") ||
+        document.querySelector("#snip-btn");
+      if (snipBtn) {
+        snipBtn.textContent = "✅ Captured!";
+        snipBtn.style.background = "green";
+        setTimeout(() => {
+          snipBtn.textContent = "Snip ✂️";
+          snipBtn.style.background = "";
+        }, 2000);
+      }
+    }, 100);
+
+    // Force refresh gallery with multiple attempts
+    const refreshGallery = () => {
+      const activeSection = document.getElementById("active-snip-section");
+      if (activeSection) {
+        console.log("📸 Forcing gallery refresh...");
+        updateGallery(activeSection);
+      }
+    };
+
+    setTimeout(refreshGallery, 300);
+    setTimeout(refreshGallery, 800);
+    setTimeout(refreshGallery, 1500);
 
     console.log("📸 CAPTURE COMPLETE!");
   } catch (error) {
-    console.error("❌ SIMPLE CAPTURE ERROR:", error);
+    console.error("❌ ROBUST CAPTURE ERROR:", error);
     alert("Capture failed: " + error.message);
   }
 }
@@ -580,84 +629,95 @@ function renderSnip() {
   setTimeout(refreshGallery, 1000);
 }
 
-// SUPER SIMPLE updateGallery - Use base64 data directly
+// ROBUST updateGallery - Add delays for stability
 function updateGallery(container) {
-  console.log("🔄 SIMPLE GALLERY UPDATE");
+  console.log("🔄 ROBUST GALLERY UPDATE");
 
-  const gallery = container.querySelector(".snip-gallery");
-  if (!gallery) {
-    console.log("❌ No gallery found");
-    return;
-  }
-
-  // Get fresh snips
-  const saved = localStorage.getItem("glyphie-snips");
-  const snips = saved ? JSON.parse(saved) : [];
-  storedSnips = snips;
-
-  console.log("🔄 Found", snips.length, "snips in storage");
-
-  gallery.innerHTML = "";
-
-  if (snips.length === 0) {
-    gallery.innerHTML = `
-      <div style="text-align: center; padding: 20px; color: #666;">
-        <div style="font-size: 3em;">📷</div>
-        <div>No snips yet</div>
-      </div>
-    `;
-    return;
-  }
-
-  // Show snips - newest first
-  snips.reverse().forEach((snip, index) => {
-    console.log(`🔄 Creating gallery item ${index + 1}:`, snip.dimensions);
-
-    const item = document.createElement("div");
-    item.style.cssText = `
-      background: #333;
-      border: 2px solid #555;
-      border-radius: 8px;
-      padding: 8px;
-      margin: 4px;
-      cursor: pointer;
-      position: relative;
-    `;
-
-    if (selectedSnips.includes(snip.id)) {
-      item.style.borderColor = "#bbff00";
+  // Add small delay to ensure DOM is ready
+  setTimeout(() => {
+    const gallery = container.querySelector(".snip-gallery");
+    if (!gallery) {
+      console.log("❌ No gallery found, retrying...");
+      setTimeout(() => updateGallery(container), 500);
+      return;
     }
 
-    item.innerHTML = `
-      <img src="${snip.data}" 
-           style="width: 100px; height: 60px; object-fit: cover; border-radius: 4px; display: block;"
-           alt="Snip ${index + 1}">
-      <div style="text-align: center; font-size: 11px; color: #ccc; margin-top: 4px;">
-        ${snip.dimensions.width} × ${snip.dimensions.height}
-      </div>
-      <button onclick="this.parentElement.remove()" 
-              style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 10px;">×</button>
-    `;
+    // Get fresh snips with retry
+    let snips = [];
+    try {
+      const saved = localStorage.getItem("glyphie-snips");
+      snips = saved ? JSON.parse(saved) : [];
+      storedSnips = snips;
+    } catch (error) {
+      console.error("❌ Error parsing snips:", error);
+      return;
+    }
 
-    // Click to select
-    item.onclick = (e) => {
-      if (e.target.tagName === "BUTTON") return;
+    console.log("🔄 Found", snips.length, "snips in storage");
 
-      const index = selectedSnips.indexOf(snip.id);
-      if (index > -1) {
-        selectedSnips.splice(index, 1);
-        item.style.borderColor = "#555";
-      } else {
-        selectedSnips.push(snip.id);
-        item.style.borderColor = "#bbff00";
-      }
-      console.log("Selected snips:", selectedSnips);
-    };
+    gallery.innerHTML = "";
 
-    gallery.appendChild(item);
-  });
+    if (snips.length === 0) {
+      gallery.innerHTML = `
+        <div style="text-align: center; padding: 20px; color: #666;">
+          <div style="font-size: 3em;">📷</div>
+          <div>No snips yet</div>
+        </div>
+      `;
+      return;
+    }
 
-  console.log("✅ Gallery updated with", snips.length, "items");
+    // Create items with small delays
+    snips.reverse().forEach((snip, index) => {
+      setTimeout(() => {
+        console.log(`🔄 Creating gallery item ${index + 1}`);
+
+        const item = document.createElement("div");
+        item.style.cssText = `
+          background: #333;
+          border: 2px solid #555;
+          border-radius: 8px;
+          padding: 8px;
+          margin: 4px;
+          cursor: pointer;
+          position: relative;
+        `;
+
+        if (selectedSnips.includes(snip.id)) {
+          item.style.borderColor = "#bbff00";
+        }
+
+        item.innerHTML = `
+          <img src="${snip.data}" 
+               style="width: 100px; height: 60px; object-fit: cover; border-radius: 4px; display: block;"
+               alt="Snip ${index + 1}">
+          <div style="text-align: center; font-size: 11px; color: #ccc; margin-top: 4px;">
+            ${snip.dimensions.width} × ${snip.dimensions.height}
+          </div>
+          <button onclick="this.parentElement.remove()" 
+                  style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 10px;">×</button>
+        `;
+
+        item.onclick = (e) => {
+          if (e.target.tagName === "BUTTON") return;
+
+          const idx = selectedSnips.indexOf(snip.id);
+          if (idx > -1) {
+            selectedSnips.splice(idx, 1);
+            item.style.borderColor = "#555";
+          } else {
+            selectedSnips.push(snip.id);
+            item.style.borderColor = "#bbff00";
+          }
+          console.log("Selected snips:", selectedSnips);
+        };
+
+        gallery.appendChild(item);
+      }, index * 50); // Small delay between each item
+    });
+
+    console.log("✅ Gallery update initiated");
+  }, 100);
 }
 
 // Crop image function
@@ -691,36 +751,25 @@ function cropImage(dataUrl, coordinates) {
   });
 }
 
-// UPDATED setupSnipEventListeners - COMPLETE VERSION
+// UPDATED setupSnipEventListeners - Load chat history
 function setupSnipEventListeners(snipContainer) {
   console.log("🔍 Setting up snip event listeners");
 
-  // Always load fresh snips from storage
   loadStoredSnips();
 
   const snipBtn = snipContainer.querySelector("#snip-btn");
   const snipInput = snipContainer.querySelector("#snip-chat-input");
   const snipSendBtn = snipContainer.querySelector("#snip-send-btn");
   const snipChatHistory = snipContainer.querySelector("#snip-chat-history");
-  // Add this to setupSnipEventListeners function
-  const manualRefreshBtn = snipContainer.querySelector("#manual-refresh-btn");
-  if (manualRefreshBtn) {
-    manualRefreshBtn.addEventListener("click", () => {
-      console.log("🔄 MANUAL REFRESH CLICKED");
-      const saved = localStorage.getItem("glyphie-snips");
-      console.log(
-        "Storage check:",
-        saved ? `${JSON.parse(saved).length} snips` : "empty"
-      );
-      updateGallery(snipContainer);
-    });
-  }
 
   // Change IDs to avoid conflicts
   if (snipBtn) snipBtn.id = "active-snip-btn";
   if (snipInput) snipInput.id = "active-snip-input";
   if (snipSendBtn) snipSendBtn.id = "active-snip-send-btn";
   if (snipChatHistory) snipChatHistory.id = "active-snip-chat-history";
+
+  // LOAD CHAT HISTORY FOR SNIPS
+  loadSnipChatHistory(snipChatHistory);
 
   // Create and insert snip gallery
   createSnipGallery(snipContainer);
@@ -730,25 +779,17 @@ function setupSnipEventListeners(snipContainer) {
     snipBtn.addEventListener("click", handleSnipAction);
   }
 
-  // Update the send button listener in setupSnipEventListeners
   if (snipSendBtn) {
     snipSendBtn.addEventListener("click", async () => {
       const message = snipInput?.value.trim();
       if (selectedSnips.length > 0 || message) {
-        // Show loading state
         snipSendBtn.textContent = "Sending...";
         snipSendBtn.disabled = true;
 
-        console.log(
-          "📤 Starting send with:",
-          selectedSnips.length,
-          "images and message:",
-          message
-        );
+        console.log("📤 Starting send with:", selectedSnips.length, "images");
 
         await handleSnipSend(snipChatHistory, message);
 
-        // Reset UI
         if (snipInput) snipInput.value = "";
         selectedSnips = [];
         updateGallery(snipContainer);
@@ -769,36 +810,17 @@ function setupSnipEventListeners(snipContainer) {
       }
     });
   }
-  // Add this inside setupSnipEventListeners function - AFTER the existing code
-  const debugClear = snipContainer.querySelector("#debug-clear-snips");
-  if (debugClear) {
-    debugClear.addEventListener("click", () => {
-      localStorage.removeItem("glyphie-snips");
-      storedSnips = [];
-      selectedSnips = [];
-      updateGallery(snipContainer);
-      console.log("🗑️ Cleared all snips");
-    });
-  }
 
-  const debugShow = snipContainer.querySelector("#debug-show-snips");
-  if (debugShow) {
-    debugShow.addEventListener("click", () => {
+  // Manual refresh button
+  const manualRefreshBtn = snipContainer.querySelector("#manual-refresh-btn");
+  if (manualRefreshBtn) {
+    manualRefreshBtn.addEventListener("click", () => {
+      console.log("🔄 MANUAL REFRESH CLICKED");
       const saved = localStorage.getItem("glyphie-snips");
-      const snips = saved ? JSON.parse(saved) : [];
-      console.log("📊 STORAGE DEBUG:");
-      console.log("Raw localStorage:", saved);
-      console.log("Parsed snips:", snips);
-      console.log("Global storedSnips:", storedSnips);
-      console.log("Selected snips:", selectedSnips);
-      alert(`Storage has ${snips.length} snips. Check console for details.`);
-    });
-  }
-
-  const debugRefresh = snipContainer.querySelector("#debug-refresh-gallery");
-  if (debugRefresh) {
-    debugRefresh.addEventListener("click", () => {
-      console.log("🔄 Manual gallery refresh triggered");
+      console.log(
+        "Storage check:",
+        saved ? `${JSON.parse(saved).length} snips` : "empty"
+      );
       updateGallery(snipContainer);
     });
   }
@@ -1898,5 +1920,71 @@ window.testSnipCapture = function () {
   // Call capture directly
   captureScreenshotArea(testCoordinates);
 };
+
+// NEW: Load chat history for snip conversations
+async function loadSnipChatHistory(chatHistoryDiv) {
+  console.log("📜 Loading snip chat history...");
+
+  if (!chatHistoryDiv) {
+    console.warn("No chat history div found");
+    return;
+  }
+
+  try {
+    // Get or create snip chat ID
+    let chatId = localStorage.getItem(`intentkit_chatid_snip`);
+
+    if (!chatId) {
+      console.log("📜 No existing snip chat, will create when needed");
+      chatHistoryDiv.innerHTML = `
+        <div style="text-align: center; padding: 20px; color: #666;">
+          <div style="font-size: 2em; margin-bottom: 10px;">💬</div>
+          <div>Send your first snip to start the conversation!</div>
+        </div>
+      `;
+      return;
+    }
+
+    console.log("📜 Loading history for chat:", chatId);
+
+    // Load chat history
+    const history = await getChatHistory(chatId, "white", 50);
+
+    if (history.length === 0) {
+      chatHistoryDiv.innerHTML = `
+        <div style="text-align: center; padding: 20px; color: #666;">
+          <div style="font-size: 2em; margin-bottom: 10px;">💬</div>
+          <div>No messages yet. Send a snip to start!</div>
+        </div>
+      `;
+      return;
+    }
+
+    // Clear and display history (oldest first)
+    chatHistoryDiv.innerHTML = "";
+
+    history.reverse().forEach((msg) => {
+      const authorType = msg.author_type?.toLowerCase();
+      const author =
+        authorType === "api" || authorType === "user" ? "user" : "bot";
+      appendSnipMessage(chatHistoryDiv, author, msg.message, msg.created_at);
+    });
+
+    // Scroll to bottom
+    setTimeout(() => {
+      chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+    }, 100);
+
+    console.log("📜 Loaded", history.length, "messages");
+  } catch (error) {
+    console.error("❌ Failed to load snip chat history:", error);
+    chatHistoryDiv.innerHTML = `
+      <div style="text-align: center; padding: 20px; color: #666;">
+        <div style="font-size: 2em; margin-bottom: 10px;">⚠️</div>
+        <div>Could not load chat history</div>
+      </div>
+    `;
+  }
+}
 
 document.addEventListener("DOMContentLoaded", init);
