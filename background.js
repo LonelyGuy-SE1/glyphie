@@ -1,50 +1,3 @@
-// background.js - FIXED VERSION (No cropping in service worker)
-console.log("🔧 Background script loaded");
-
-let captureInProgress = false;
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("🔧 BACKGROUND: Received message:", message.type);
-
-  if (message.type === "CAPTURE_AREA") {
-    console.log(
-      "📸 BACKGROUND: Processing capture request:",
-      message.coordinates
-    );
-
-    if (captureInProgress) {
-      console.log("⚠️ BACKGROUND: Capture already in progress");
-      sendResponse({ success: false, error: "Capture in progress" });
-      return;
-    }
-
-    captureInProgress = true;
-    handleCapture(message.coordinates, sender.tab.id)
-      .then((result) => {
-        captureInProgress = false;
-        console.log("✅ BACKGROUND: Capture completed successfully");
-        sendResponse({ success: true, snipId: result.id });
-      })
-      .catch((error) => {
-        captureInProgress = false;
-        console.error("❌ BACKGROUND: Capture failed:", error);
-        sendResponse({ success: false, error: error.message });
-      });
-
-    return true;
-  }
-
-  if (message.type === "GET_SNIPS") {
-    chrome.storage.local.get(["glyphie-snips"], (result) => {
-      const snips = result["glyphie-snips"] || [];
-      sendResponse({ success: true, snips: snips });
-    });
-    return true;
-  }
-
-  return false;
-});
-
 async function handleCapture(coordinates, tabId) {
   console.log("📸 BACKGROUND CAPTURE: Starting");
 
@@ -74,6 +27,9 @@ async function handleCapture(coordinates, tabId) {
         width: Math.round(coordinates.width),
         height: Math.round(coordinates.height),
       },
+      name: `Screenshot ${Math.round(coordinates.width)}×${Math.round(
+        coordinates.height
+      )}`,
     };
 
     // Step 4: Save to storage
@@ -87,7 +43,17 @@ async function handleCapture(coordinates, tabId) {
       existingSnips.length
     );
 
-    // Step 5: Show success notification
+    // Step 5: SET NAVIGATION FLAG - This will make extension open to snip page
+    await chrome.storage.local.set({
+      "glyphie-goto-snip": true,
+      "glyphie-new-snip-id": snipData.id,
+      "glyphie-new-snip-timestamp": Date.now(),
+    });
+    console.log(
+      "📸 BACKGROUND: Set navigation flag - extension will open to snip page"
+    );
+
+    // Step 6: Show success notification
     await chrome.scripting.executeScript({
       target: { tabId: tabId },
       func: (dimensions) => {
@@ -104,52 +70,21 @@ async function handleCapture(coordinates, tabId) {
           <div style="text-align: center;">
             <div style="font-size: 18px;">✅ Snip Saved!</div>
             <div style="font-size: 12px; margin-top: 5px;">Size: ${dimensions.width}×${dimensions.height}px</div>
-            <div style="font-size: 11px; margin-top: 3px;">Click extension to view</div>
+            <div style="font-size: 11px; margin-top: 3px; color: #bbff00;">Click extension to view & use</div>
           </div>
         `;
         document.body.appendChild(success);
-        setTimeout(() => success.remove(), 5000);
+        setTimeout(() => success.remove(), 6000);
       },
       args: [snipData.dimensions],
     });
 
+    console.log(
+      "✅ BACKGROUND: Capture completed, user will be taken to snip page on next open"
+    );
     return snipData;
   } catch (error) {
     console.error("❌ BACKGROUND: Capture failed:", error);
     throw error;
   }
-}
-
-// Send to popup for cropping (since service worker can't use Canvas/Image)
-async function sendToCropInPopup(dataUrl, coordinates) {
-  return new Promise((resolve, reject) => {
-    // Try to send to any open popup
-    chrome.runtime.sendMessage(
-      {
-        type: "CROP_IMAGE",
-        dataUrl: dataUrl,
-        coordinates: coordinates,
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          console.error(
-            "❌ BACKGROUND: No popup available for cropping:",
-            chrome.runtime.lastError
-          );
-          // Fallback: return uncropped image
-          resolve(dataUrl);
-        } else if (response && response.success) {
-          resolve(response.croppedImage);
-        } else {
-          reject(new Error("Cropping failed"));
-        }
-      }
-    );
-
-    // Timeout fallback
-    setTimeout(() => {
-      console.warn("⚠️ BACKGROUND: Cropping timeout, using full image");
-      resolve(dataUrl);
-    }, 3000);
-  });
 }

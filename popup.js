@@ -710,65 +710,88 @@ async function captureScreenshotArea(coordinates) {
   }
 }
 
-// UPDATE your init function - Add expand button listener
-function init() {
+// ENHANCED init function - Auto-navigate to snip page after capture
+async function init() {
   console.log("🔧 INIT: Extension initializing...");
 
-  // Add expand button listener
-  const expandBtn = document.getElementById("minimized-expand-btn");
-  if (expandBtn) {
-    expandBtn.addEventListener("click", expandPopup);
-  }
+  // Check navigation flags from chrome.storage
+  try {
+    const result = await chrome.storage.local.get([
+      "glyphie-goto-snip",
+      "glyphie-new-snip-id",
+      "glyphie-new-snip-timestamp",
+    ]);
 
-  // ... rest of your existing init function code ...
+    const gotoSnip = result["glyphie-goto-snip"];
+    const newSnipId = result["glyphie-new-snip-id"];
+    const newSnipTimestamp = result["glyphie-new-snip-timestamp"];
 
-  // Check flags FIRST before setting up other listeners
-  const gotoSnip = localStorage.getItem("glyphie-goto-snip");
-  const newSnip = localStorage.getItem("glyphie-new-snip");
-
-  console.log("🔧 INIT: Flags - gotoSnip:", gotoSnip, "newSnip:", newSnip);
-
-  // Set up sidebar button listeners
-  sidebarButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      sidebarButtons.forEach((btn) => btn.classList.remove("active"));
-      button.classList.add("active");
-      const section = button.getAttribute("data-section");
-      loadSection(section);
-
-      const sidebar = document.getElementById("sidebar");
-      const toggleBtn = document.getElementById("sidebar-toggle");
-      if (sidebar.classList.contains("open")) {
-        sidebar.classList.remove("open");
-        toggleBtn.textContent = "☰";
-      }
+    console.log("🔧 INIT: Navigation flags:", {
+      gotoSnip,
+      newSnipId,
+      newSnipTimestamp,
     });
-  });
 
-  // Navigate based on flags
-  if (gotoSnip) {
-    console.log("🔧 INIT: Auto-navigating to snip page after capture");
-    localStorage.removeItem("glyphie-goto-snip");
+    // Set up sidebar button listeners first
+    sidebarButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        sidebarButtons.forEach((btn) => btn.classList.remove("active"));
+        button.classList.add("active");
+        const section = button.getAttribute("data-section");
+        loadSection(section);
 
-    // Set snip button as active
-    sidebarButtons.forEach((btn) => btn.classList.remove("active"));
-    const snipButton = document.querySelector('[data-section="snip"]');
-    if (snipButton) {
-      snipButton.classList.add("active");
-      console.log("🔧 INIT: Set snip button as active");
+        const sidebar = document.getElementById("sidebar");
+        const toggleBtn = document.getElementById("sidebar-toggle");
+        if (sidebar.classList.contains("open")) {
+          sidebar.classList.remove("open");
+          toggleBtn.textContent = "☰";
+        }
+      });
+    });
+
+    // Navigate based on flags
+    if (gotoSnip) {
+      console.log("🔧 INIT: Auto-navigating to snip page after capture");
+
+      // Clear the navigation flags
+      await chrome.storage.local.remove([
+        "glyphie-goto-snip",
+        "glyphie-new-snip-id",
+        "glyphie-new-snip-timestamp",
+      ]);
+
+      // Set snip button as active
+      sidebarButtons.forEach((btn) => btn.classList.remove("active"));
+      const snipButton = document.querySelector('[data-section="snip"]');
+      if (snipButton) {
+        snipButton.classList.add("active");
+        console.log("🔧 INIT: Set snip button as active");
+      }
+
+      // Load snip section with highlighting for new snip
+      setTimeout(() => {
+        console.log("🔧 INIT: Loading snip section with new snip highlight...");
+        loadSection("snip");
+
+        // If we have a new snip ID, we can highlight it later
+        if (newSnipId) {
+          setTimeout(() => {
+            highlightNewSnip(newSnipId);
+          }, 1000);
+        }
+      }, 100);
+    } else {
+      console.log("🔧 INIT: Loading default characters section");
+      loadSection("characters");
     }
 
-    // Load snip section
-    setTimeout(() => {
-      console.log("🔧 INIT: Loading snip section...");
-      loadSection("snip");
-    }, 100);
-  } else {
-    console.log("🔧 INIT: Loading default characters section");
+    applySavedTheme();
+  } catch (error) {
+    console.error("❌ INIT: Error checking navigation flags:", error);
+    // Fallback to default behavior
     loadSection("characters");
+    applySavedTheme();
   }
-
-  applySavedTheme();
 }
 
 // UPDATED renderSnip - Force gallery refresh multiple ways
@@ -837,7 +860,7 @@ function renderSnip() {
   setTimeout(refreshGallery, 1000);
 }
 
-// UPDATED updateGallery - Use chrome.storage with debugging
+// ENHANCED updateGallery - Fixed delete + rename functionality
 async function updateGallery(container) {
   console.log("🔄 GALLERY: Starting update");
 
@@ -849,7 +872,7 @@ async function updateGallery(container) {
 
   // Load from chrome.storage
   try {
-    await loadStoredSnips(); // This now uses chrome.storage
+    await loadStoredSnips();
     console.log("🔄 GALLERY: Loaded", storedSnips.length, "snips from storage");
   } catch (error) {
     console.error("❌ GALLERY: Error loading snips:", error);
@@ -863,13 +886,7 @@ async function updateGallery(container) {
     gallery.innerHTML = `
       <div style="text-align: center; padding: 20px; color: #666;">
         <div style="font-size: 3em;">📷</div>
-        <div>No snips yet - check browser console for debug info</div>
-        <button onclick="console.log('Current snips:', ${JSON.stringify(
-          storedSnips
-        )})" 
-                style="margin-top: 10px; padding: 5px 10px; background: #333; color: #fff; border: none; border-radius: 4px;">
-          Debug Storage
-        </button>
+        <div>No snips yet</div>
       </div>
     `;
     return;
@@ -877,48 +894,130 @@ async function updateGallery(container) {
 
   console.log("🔄 GALLERY: Creating", storedSnips.length, "gallery items");
 
-  // Create items
+  // Create items with enhanced functionality
   storedSnips.reverse().forEach((snip, index) => {
     console.log(`🔄 GALLERY: Creating item ${index + 1}:`, snip.id);
 
     const item = document.createElement("div");
+    item.className = "snip-item-enhanced";
     item.style.cssText = `
       background: #333; border: 2px solid #555; border-radius: 8px;
       padding: 8px; margin: 4px; cursor: pointer; position: relative;
+      transition: all 0.3s ease;
     `;
 
     if (selectedSnips.includes(snip.id)) {
       item.style.borderColor = "#bbff00";
+      item.style.boxShadow = "0 0 10px rgba(187, 255, 0, 0.5)";
     }
+
+    // Default name if not set
+    const displayName =
+      snip.name ||
+      `Screenshot ${snip.dimensions.width}×${snip.dimensions.height}`;
 
     item.innerHTML = `
       <img src="${snip.data}" 
            style="width: 100px; height: 60px; object-fit: cover; border-radius: 4px; display: block;"
-           alt="Snip ${index + 1}"
-           onload="console.log('✅ Image ${index + 1} loaded successfully')"
-           onerror="console.error('❌ Image ${index + 1} failed to load')">
-      <div style="text-align: center; font-size: 11px; color: #ccc; margin-top: 4px;">
+           alt="Snip ${index + 1}">
+      
+      <div class="snip-name" style="text-align: center; font-size: 10px; color: #ccc; margin-top: 4px; 
+                                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;">
+        ${displayName}
+      </div>
+      
+      <div class="snip-dimensions" style="text-align: center; font-size: 9px; color: #888; margin-top: 2px;">
         ${snip.dimensions.width} × ${snip.dimensions.height}
       </div>
-      <button onclick="this.parentElement.remove(); console.log('🗑️ Removed snip ${
-        snip.id
-      }')" 
-              style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 10px;">×</button>
+      
+      <button class="snip-delete-btn" 
+              style="position: absolute; top: 2px; right: 2px; background: #ff4444; color: white; 
+                     border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 10px;
+                     cursor: pointer; z-index: 10; transition: all 0.2s ease;"
+              onmouseover="this.style.background='#ff6666'; this.style.transform='scale(1.1)'"
+              onmouseout="this.style.background='#ff4444'; this.style.transform='scale(1)'">×</button>
+      
+      <button class="snip-rename-btn" 
+              style="position: absolute; top: 2px; left: 2px; background: #4444ff; color: white; 
+                     border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 10px;
+                     cursor: pointer; z-index: 10; transition: all 0.2s ease;"
+              onmouseover="this.style.background='#6666ff'; this.style.transform='scale(1.1)'"
+              onmouseout="this.style.background='#4444ff'; this.style.transform='scale(1)'"
+              title="Rename snip">✏️</button>
     `;
 
-    item.onclick = (e) => {
-      if (e.target.tagName === "BUTTON") return;
+    // Delete button functionality
+    const deleteBtn = item.querySelector(".snip-delete-btn");
+    deleteBtn.addEventListener("click", async (e) => {
+      e.stopPropagation(); // Prevent item selection
+
+      if (confirm(`Delete "${displayName}"?`)) {
+        console.log("🗑️ Deleting snip:", snip.id);
+
+        // Remove from storage
+        const updatedSnips = storedSnips.filter((s) => s.id !== snip.id);
+        await chrome.storage.local.set({ "glyphie-snips": updatedSnips });
+
+        // Remove from selected list
+        selectedSnips = selectedSnips.filter((id) => id !== snip.id);
+
+        // Update local array
+        storedSnips = updatedSnips;
+
+        // Refresh gallery
+        updateGallery(container);
+
+        console.log("✅ Snip deleted successfully");
+      }
+    });
+
+    // Rename button functionality
+    const renameBtn = item.querySelector(".snip-rename-btn");
+    renameBtn.addEventListener("click", async (e) => {
+      e.stopPropagation(); // Prevent item selection
+
+      const currentName = snip.name || "";
+      const newName = prompt(`Rename snip:`, currentName);
+
+      if (newName !== null && newName.trim() !== "") {
+        console.log("✏️ Renaming snip:", snip.id, "to:", newName.trim());
+
+        // Update snip data
+        snip.name = newName.trim();
+
+        // Save to storage
+        await chrome.storage.local.set({ "glyphie-snips": storedSnips });
+
+        // Refresh gallery
+        updateGallery(container);
+
+        console.log("✅ Snip renamed successfully");
+      }
+    });
+
+    // Item selection (click on image or name area)
+    item.addEventListener("click", (e) => {
+      // Only trigger selection if not clicking buttons
+      if (
+        e.target.classList.contains("snip-delete-btn") ||
+        e.target.classList.contains("snip-rename-btn")
+      ) {
+        return;
+      }
+
       const idx = selectedSnips.indexOf(snip.id);
       if (idx > -1) {
         selectedSnips.splice(idx, 1);
         item.style.borderColor = "#555";
+        item.style.boxShadow = "none";
         console.log("📤 Deselected snip:", snip.id);
       } else {
         selectedSnips.push(snip.id);
         item.style.borderColor = "#bbff00";
+        item.style.boxShadow = "0 0 10px rgba(187, 255, 0, 0.5)";
         console.log("📥 Selected snip:", snip.id);
       }
-    };
+    });
 
     gallery.appendChild(item);
   });
@@ -1085,7 +1184,7 @@ function createSnipGallery(container) {
   updateGallery(container);
 }
 
-// UPDATED handleSnipSend - Send images to Crestal API
+// ENHANCED handleSnipSend - Use custom names in descriptions
 async function handleSnipSend(chatHistoryDiv, message) {
   console.log("📤 SENDING SNIPS:", selectedSnips.length, "selected");
 
@@ -1106,7 +1205,7 @@ async function handleSnipSend(chatHistoryDiv, message) {
     appendSnipMessage(chatHistoryDiv, "user", message, timestamp);
   }
 
-  // Add selected snips to chat display
+  // Add selected snips to chat display with names
   selectedSnips.forEach((snipId) => {
     const snip = storedSnips.find((s) => s.id === snipId);
     if (snip) {
@@ -1160,10 +1259,13 @@ async function handleSnipSend(chatHistoryDiv, message) {
 
     console.log("📤 Successfully uploaded", uploadedImages.length, "images");
 
-    // Create text description of images
+    // Create text description of images using custom names
     const imageDescriptions = selectedSnips.map((snipId, index) => {
       const snip = storedSnips.find((s) => s.id === snipId);
-      return `Image ${index + 1}: Screenshot (${snip.dimensions.width}×${
+      const snipName =
+        snip.name ||
+        `Screenshot ${snip.dimensions.width}×${snip.dimensions.height}`;
+      return `Image ${index + 1}: "${snipName}" (${snip.dimensions.width}×${
         snip.dimensions.height
       }px) captured on ${new Date(snip.timestamp).toLocaleString()}`;
     });
@@ -1192,7 +1294,7 @@ async function handleSnipSend(chatHistoryDiv, message) {
       },
       body: JSON.stringify({
         message: fullMessage,
-        attachments: uploadedImages, // Send the uploaded images
+        attachments: uploadedImages,
         stream: true,
       }),
     });
@@ -1266,7 +1368,7 @@ async function createSnipChatThread() {
   return chatId;
 }
 
-// UPDATED appendSnipImageMessage - Use base64 data
+// UPDATED appendSnipImageMessage - Show custom names
 function appendSnipImageMessage(container, snipData, timestamp) {
   const msg = document.createElement("div");
   msg.className = "message snip";
@@ -1275,7 +1377,7 @@ function appendSnipImageMessage(container, snipData, timestamp) {
   content.className = "msg-content";
 
   const img = document.createElement("img");
-  img.src = snipData.data; // Use base64 data directly
+  img.src = snipData.data;
   img.className = "snip-image";
   img.alt = "Snipped image";
   img.style.cssText = `
@@ -1295,7 +1397,12 @@ function appendSnipImageMessage(container, snipData, timestamp) {
     font-size: 12px; 
     color: var(--accent-color);
   `;
-  caption.textContent = `✂️ Snip (${snipData.dimensions.width}×${snipData.dimensions.height}px)`;
+
+  // Use custom name if available
+  const displayName =
+    snipData.name ||
+    `Screenshot ${snipData.dimensions.width}×${snipData.dimensions.height}`;
+  caption.textContent = `✂️ ${displayName}`;
 
   content.appendChild(img);
   content.appendChild(caption);
@@ -2103,6 +2210,82 @@ function cropImage(dataUrl, coordinates) {
     };
     img.src = dataUrl;
   });
+}
+// NEW: Highlight newly captured snip in gallery
+function highlightNewSnip(snipId) {
+  console.log("✨ HIGHLIGHT: Looking for new snip:", snipId);
+
+  // Find the snip item in the gallery
+  const gallery = document.querySelector(".snip-gallery");
+  if (!gallery) {
+    console.log("❌ HIGHLIGHT: No gallery found");
+    return;
+  }
+
+  // Look for the snip item (we'll need to add data attributes)
+  const snipItems = gallery.querySelectorAll(".snip-item-enhanced");
+  let targetItem = null;
+
+  // Find the item by checking the stored snips
+  const targetSnip = storedSnips.find((s) => s.id === snipId);
+  if (!targetSnip) {
+    console.log("❌ HIGHLIGHT: Snip not found in storage");
+    return;
+  }
+
+  // Find the corresponding DOM element (newest snips are first, so check order)
+  const sortedSnips = [...storedSnips].reverse();
+  const snipIndex = sortedSnips.findIndex((s) => s.id === snipId);
+
+  if (snipIndex !== -1 && snipItems[snipIndex]) {
+    targetItem = snipItems[snipIndex];
+  }
+
+  if (targetItem) {
+    console.log("✨ HIGHLIGHT: Found target item, highlighting...");
+
+    // Add highlight effect
+    targetItem.style.animation = "newSnipPulse 2s ease-in-out 3 alternate";
+    targetItem.style.borderColor = "#00ff88";
+    targetItem.style.boxShadow = "0 0 20px rgba(0, 255, 136, 0.8)";
+
+    // Scroll into view if needed
+    targetItem.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    // Remove highlight after animation
+    setTimeout(() => {
+      targetItem.style.animation = "";
+      // Only remove highlight if not selected
+      if (!selectedSnips.includes(snipId)) {
+        targetItem.style.borderColor = "#555";
+        targetItem.style.boxShadow = "none";
+      }
+      console.log("✨ HIGHLIGHT: Highlight removed");
+    }, 6000);
+
+    // Show a small tooltip
+    const tooltip = document.createElement("div");
+    tooltip.style.cssText = `
+      position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+      background: #00ff88; color: #000; padding: 4px 8px; border-radius: 4px;
+      font-size: 10px; font-weight: bold; z-index: 1000;
+      animation: fadeInOut 4s ease-in-out;
+    `;
+    tooltip.textContent = "New!";
+    targetItem.style.position = "relative";
+    targetItem.appendChild(tooltip);
+
+    setTimeout(() => {
+      if (tooltip.parentNode) {
+        tooltip.remove();
+      }
+    }, 4000);
+  } else {
+    console.log("❌ HIGHLIGHT: Could not find target item in DOM");
+  }
 }
 
 document.addEventListener("DOMContentLoaded", init);

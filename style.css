@@ -1294,3 +1294,41 @@ body.light .theme-label {
     border-color: #ff8800;
   }
 }
+/* === NEW SNIP HIGHLIGHT ANIMATIONS === */
+@keyframes newSnipPulse {
+  0% {
+    border-color: #555;
+    box-shadow: 0 0 5px rgba(0, 255, 136, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    border-color: #00ff88;
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.8);
+    transform: scale(1.05);
+  }
+  100% {
+    border-color: #00ff88;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeInOut {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  20%,
+  80% {
+    opacity: 1;
+  }
+}
+
+.snip-item-enhanced {
+  transition: all 0.3s ease;
+}
+
+.snip-item-enhanced:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
