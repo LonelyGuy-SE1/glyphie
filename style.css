@@ -1204,3 +1204,93 @@ body.light .theme-label {
     opacity: 0.8;
   }
 }
+/* === MINIMIZED POPUP STYLES === */
+#container.minimized {
+  width: 120px !important;
+  height: 60px !important;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  transition: all 0.3s ease;
+  border: 2px solid var(--accent-color);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(187, 255, 0, 0.6);
+}
+
+#container.minimized #wrapper {
+  display: none;
+}
+
+#container.minimized #main-content {
+  display: none;
+}
+
+#container.minimized #sidebar {
+  display: none;
+}
+
+#container.minimized #sidebar-toggle {
+  display: none;
+}
+
+/* Minimized control panel */
+.minimized-panel {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--background-color);
+  border-radius: 10px;
+  padding: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+}
+
+#container.minimized .minimized-panel {
+  display: flex;
+}
+
+.minimized-status {
+  font-size: 10px;
+  color: var(--accent-color);
+  text-align: center;
+  font-weight: bold;
+}
+
+.minimized-expand-btn {
+  background: var(--accent-color);
+  color: #000;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.minimized-expand-btn:hover {
+  background: #fff;
+  transform: scale(1.1);
+}
+
+/* Pulsing animation for snipping state */
+#container.minimized.snipping {
+  animation: snipPulse 1s infinite ease-in-out;
+}
+
+@keyframes snipPulse {
+  0%,
+  100% {
+    box-shadow: 0 4px 20px rgba(187, 255, 0, 0.6);
+    border-color: var(--accent-color);
+  }
+  50% {
+    box-shadow: 0 4px 30px rgba(255, 136, 0, 0.8);
+    border-color: #ff8800;
+  }
+}

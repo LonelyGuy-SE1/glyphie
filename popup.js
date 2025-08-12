@@ -55,377 +55,580 @@ let pendingAttachmentPreviewUrl = null;
 
 // === SNIP FUNCTIONALITY ===
 
-// Load stored snips on init
-function loadStoredSnips() {
-  const saved = localStorage.getItem("glyphie-snips");
-  storedSnips = saved ? JSON.parse(saved) : [];
+// UPDATED loadStoredSnips - Use chrome.storage
+async function loadStoredSnips() {
+  try {
+    const result = await chrome.storage.local.get(["glyphie-snips"]);
+    storedSnips = result["glyphie-snips"] || [];
+    console.log("📁 Loaded", storedSnips.length, "snips from chrome.storage");
+  } catch (error) {
+    console.error("❌ Error loading snips:", error);
+    storedSnips = [];
+  }
 }
 
 // Save snips to localStorage
 function saveSnips() {
   localStorage.setItem("glyphie-snips", JSON.stringify(storedSnips));
 }
-
-// ROBUST handleSnipAction - Add delays for stability
+// ENHANCED handleSnipAction with more debugging
 async function handleSnipAction() {
-  console.log("🔍 Starting snip action - ROBUST VERSION");
+  console.log("🔍 POPUP: Starting snip action (ENHANCED DEBUG)");
 
   try {
     const [tab] = await chrome.tabs.query({
       active: true,
       currentWindow: true,
     });
-
-    if (!tab) {
-      alert("No active tab found");
+    if (!tab || tab.url.startsWith("chrome://")) {
+      alert("Cannot snip on this page");
       return;
     }
 
-    console.log("🔍 Injecting script into tab:", tab.id);
+    console.log("🔍 POPUP: Working with tab:", tab.id, tab.url);
 
-    // Inject script with delay
+    // Inject enhanced content script
+    console.log("🔍 POPUP: Injecting enhanced content script...");
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: injectFullSnipScript,
+      func: () => {
+        console.log("📨 CONTENT: Enhanced script starting");
+
+        if (window.glyphieSnipActive) {
+          console.log("📨 CONTENT: Already active, cleaning up first");
+          window.glyphieSnipActive = false;
+        }
+
+        window.glyphieSnipActive = true;
+
+        let overlay,
+          isSelecting = false,
+          startX = 0,
+          startY = 0;
+
+        function createOverlay() {
+          console.log("📨 CONTENT: Creating overlay");
+
+          overlay = document.createElement("div");
+          overlay.style.cssText = `
+            position: fixed !important; top: 0 !important; left: 0 !important;
+            width: 100vw !important; height: 100vh !important;
+            background: rgba(0, 0, 0, 0.4) !important; z-index: 2147483647 !important;
+            cursor: crosshair !important;
+          `;
+
+          const instructions = document.createElement("div");
+          instructions.style.cssText = `
+            position: absolute !important; top: 30px !important; left: 50% !important;
+            transform: translateX(-50%) !important; background: rgba(0, 0, 0, 0.9) !important;
+            color: #bbff00 !important; padding: 15px 25px !important;
+            border: 3px solid #bbff00 !important; border-radius: 10px !important;
+            font-size: 16px !important; font-weight: bold !important; text-align: center !important;
+          `;
+          instructions.innerHTML =
+            "✂️ Click and drag to select area<br><small>Press ESC to cancel</small>";
+
+          const selectionBox = document.createElement("div");
+          selectionBox.style.cssText = `
+            position: absolute !important; border: 4px dashed #bbff00 !important;
+            background: rgba(187, 255, 0, 0.15) !important; display: none !important;
+            pointer-events: none !important;
+          `;
+
+          overlay.append(instructions, selectionBox);
+          document.body.appendChild(overlay);
+          console.log("📨 CONTENT: Overlay added to page");
+
+          overlay.onmousedown = (e) => {
+            console.log("📨 CONTENT: Mouse down at", e.clientX, e.clientY);
+            isSelecting = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            selectionBox.style.left = startX + "px";
+            selectionBox.style.top = startY + "px";
+            selectionBox.style.width = "0px";
+            selectionBox.style.height = "0px";
+            selectionBox.style.display = "block";
+            e.preventDefault();
+          };
+
+          overlay.onmousemove = (e) => {
+            if (!isSelecting) return;
+            const width = Math.abs(e.clientX - startX),
+              height = Math.abs(e.clientY - startY);
+            selectionBox.style.left = Math.min(startX, e.clientX) + "px";
+            selectionBox.style.top = Math.min(startY, e.clientY) + "px";
+            selectionBox.style.width = width + "px";
+            selectionBox.style.height = height + "px";
+            instructions.innerHTML = `📏 ${Math.round(width)} × ${Math.round(
+              height
+            )}px`;
+          };
+
+          overlay.onmouseup = (e) => {
+            if (!isSelecting) return;
+            isSelecting = false;
+            console.log("📨 CONTENT: Mouse up, processing selection");
+
+            const rect = selectionBox.getBoundingClientRect();
+            console.log("📨 CONTENT: Selection rect:", rect);
+
+            if (rect.width > 20 && rect.height > 20) {
+              instructions.innerHTML = "✅ Processing... Please wait";
+              instructions.style.borderColor = "#00ff88";
+
+              const coordinates = {
+                x: rect.left,
+                y: rect.top,
+                width: rect.width,
+                height: rect.height,
+              };
+
+              console.log(
+                "📨 CONTENT: Sending CAPTURE_AREA to background:",
+                coordinates
+              );
+
+              // Send to background script
+              chrome.runtime.sendMessage(
+                {
+                  type: "CAPTURE_AREA",
+                  coordinates: coordinates,
+                },
+                (response) => {
+                  console.log("📨 CONTENT: Background response:", response);
+                  if (chrome.runtime.lastError) {
+                    console.error(
+                      "📨 CONTENT: Runtime error:",
+                      chrome.runtime.lastError
+                    );
+                  }
+                }
+              );
+
+              // Remove overlay after delay
+              setTimeout(() => {
+                if (overlay) {
+                  overlay.remove();
+                  window.glyphieSnipActive = false;
+                  console.log("📨 CONTENT: Overlay removed");
+                }
+              }, 1000);
+            } else {
+              console.log("📨 CONTENT: Selection too small");
+              instructions.innerHTML = "❌ Too small! Try again";
+              selectionBox.style.display = "none";
+            }
+          };
+
+          document.onkeydown = (e) => {
+            if (e.key === "Escape" && overlay) {
+              console.log("📨 CONTENT: ESC pressed");
+              overlay.remove();
+              window.glyphieSnipActive = false;
+            }
+          };
+        }
+
+        createOverlay();
+        console.log("📨 CONTENT: Enhanced script completed");
+      },
     });
 
-    // Wait a bit for injection to complete
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    console.log("✅ POPUP: Enhanced content script injected");
 
-    console.log("✅ Script injected, sending message...");
+    // Update UI
+    const snipBtn =
+      document.getElementById("active-snip-btn") ||
+      document.querySelector("#snip-btn");
+    if (snipBtn) {
+      snipBtn.textContent = "Snipping... Check browser console for debug info";
+      snipBtn.disabled = true;
+      snipBtn.style.background = "#bbff00";
+      snipBtn.style.color = "#000";
+    }
 
-    // Send start message with retry logic
-    let retryCount = 0;
-    const sendMessage = () => {
-      chrome.tabs.sendMessage(tab.id, { type: "START_SNIP" }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.error("❌ Message failed:", chrome.runtime.lastError.message);
-          if (retryCount < 3) {
-            retryCount++;
-            console.log(`🔄 Retrying message (attempt ${retryCount})...`);
-            setTimeout(sendMessage, 500);
-          } else {
-            alert("Failed to start snipping after multiple attempts");
-          }
-        } else {
-          console.log("✅ Snip started:", response);
-          const snipBtn =
-            document.getElementById("active-snip-btn") ||
-            document.querySelector("#snip-btn");
-          if (snipBtn) {
-            snipBtn.textContent = "Snipping... (check webpage)";
-            snipBtn.style.background = "orange";
-          }
-        }
-      });
-    };
-
-    sendMessage();
+    console.log("✅ POPUP: Snip action completed, you can close popup now");
   } catch (error) {
-    console.error("❌ Error:", error);
-    alert("Error: " + error.message);
+    console.error("❌ POPUP: Snip action failed:", error);
+    alert("Failed to start snipping: " + error.message);
   }
 }
 
-// FIXED injectFullSnipScript - Proper response handling
-function injectFullSnipScript() {
-  console.log("🔧 SNIP: Full script injected on:", window.location.href);
+// NEW: Minimize popup function
+function minimizePopup(status = "Minimized") {
+  const container = document.getElementById("container");
+  const minimizedStatus = document.getElementById("minimized-status");
 
-  if (window.glyphieSnipLoaded) {
-    console.log("SNIP: Already loaded");
+  if (container && minimizedStatus) {
+    container.classList.add("minimized");
+    container.classList.add("snipping"); // Add pulsing animation
+    minimizedStatus.textContent = status;
+
+    console.log("📦 POPUP: Minimized with status:", status);
+
+    // Update document size to fit minimized state
+    document.body.style.width = "120px";
+    document.body.style.height = "60px";
+  }
+}
+
+// NEW: Expand popup function
+function expandPopup() {
+  const container = document.getElementById("container");
+
+  if (container) {
+    container.classList.remove("minimized");
+    container.classList.remove("snipping");
+
+    console.log("📦 POPUP: Expanded back to full size");
+
+    // Restore document size
+    document.body.style.width = "";
+    document.body.style.height = "";
+  }
+}
+
+// ROBUST content script function - Replace simpleSnipScript
+function robustSnipScript() {
+  console.log(
+    "🔧 CONTENT: Robust snip script starting on:",
+    window.location.href
+  );
+
+  // Prevent multiple loads with a more unique identifier
+  const SCRIPT_ID = "glyphie-snip-script-v2";
+  if (window[SCRIPT_ID]) {
+    console.log("🔧 CONTENT: Script already active, updating listeners");
     return;
   }
-  window.glyphieSnipLoaded = true;
+  window[SCRIPT_ID] = true;
 
   let overlay = null;
   let isSelecting = false;
   let startX = 0,
     startY = 0;
 
-  // Listen for messages with PROPER response handling
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log("📨 SNIP: Got message:", message.type);
+  // Remove any existing listeners first
+  if (window.glyphieMessageListener) {
+    chrome.runtime.onMessage.removeListener(window.glyphieMessageListener);
+  }
+
+  // Create persistent message listener
+  window.glyphieMessageListener = (message, sender, sendResponse) => {
+    console.log("📨 CONTENT: Received message:", message.type, "from:", sender);
 
     if (message.type === "START_SNIP") {
+      console.log("📨 CONTENT: Processing START_SNIP request");
+
       try {
-        createSnipOverlay();
-        sendResponse({ success: true, message: "Overlay created" }); // Send response immediately
+        createOverlay();
+        console.log("✅ CONTENT: Overlay created successfully");
+
+        // Send immediate response
+        sendResponse({
+          success: true,
+          message: "Overlay created",
+          timestamp: Date.now(),
+          url: window.location.href,
+        });
+
         return false; // Don't keep channel open
       } catch (error) {
-        console.error("SNIP: Error creating overlay:", error);
-        sendResponse({ success: false, error: error.message });
+        console.error("❌ CONTENT: Error creating overlay:", error);
+        sendResponse({
+          success: false,
+          error: error.message,
+          timestamp: Date.now(),
+        });
         return false;
       }
     }
 
-    return false; // Don't keep channel open for unknown messages
-  });
+    console.log("📨 CONTENT: Unknown message type:", message.type);
+    return false;
+  };
 
-  function createSnipOverlay() {
-    console.log("SNIP: Creating overlay");
+  // Add the persistent listener
+  chrome.runtime.onMessage.addListener(window.glyphieMessageListener);
+  console.log("✅ CONTENT: Message listener added");
 
-    // Remove existing
-    if (overlay) overlay.remove();
+  function createOverlay() {
+    console.log("🔧 CONTENT: Creating overlay");
+
+    // Clean up any existing overlay
+    if (overlay && overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
 
     overlay = document.createElement("div");
+    overlay.id = "glyphie-snip-overlay-v2";
     overlay.style.cssText = `
       position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
+      top: 0 !important; left: 0 !important;
+      width: 100vw !important; height: 100vh !important;
       background: rgba(0, 0, 0, 0.4) !important;
       z-index: 2147483647 !important;
       cursor: crosshair !important;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
     `;
 
-    // Instructions
     const instructions = document.createElement("div");
     instructions.style.cssText = `
-      position: absolute !important;
-      top: 30px !important;
-      left: 50% !important;
+      position: absolute !important; top: 30px !important; left: 50% !important;
       transform: translateX(-50%) !important;
-      background: rgba(0, 0, 0, 0.9) !important;
-      color: #bbff00 !important;
-      padding: 15px 25px !important;
-      border: 3px solid #bbff00 !important;
-      border-radius: 10px !important;
-      font-size: 16px !important;
-      font-weight: bold !important;
-      text-align: center !important;
+      background: rgba(0, 0, 0, 0.95) !important; color: #bbff00 !important;
+      padding: 15px 25px !important; border: 3px solid #bbff00 !important;
+      border-radius: 10px !important; font-size: 16px !important;
+      font-weight: bold !important; text-align: center !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8) !important;
     `;
     instructions.innerHTML =
       "✂️ Click and drag to select area<br><small>Press ESC to cancel</small>";
 
-    // Selection box
     const selectionBox = document.createElement("div");
     selectionBox.style.cssText = `
       position: absolute !important;
       border: 4px dashed #bbff00 !important;
       background: rgba(187, 255, 0, 0.15) !important;
-      display: none !important;
-      pointer-events: none !important;
+      display: none !important; pointer-events: none !important;
     `;
 
     overlay.appendChild(instructions);
     overlay.appendChild(selectionBox);
-    document.body.appendChild(overlay);
 
-    console.log("✅ SNIP: Overlay created");
-
-    // Mouse events
-    overlay.onmousedown = function (e) {
-      console.log("🖱️ SNIP: Mouse down");
-      isSelecting = true;
-      startX = e.clientX;
-      startY = e.clientY;
-
-      selectionBox.style.left = startX + "px";
-      selectionBox.style.top = startY + "px";
-      selectionBox.style.width = "0px";
-      selectionBox.style.height = "0px";
-      selectionBox.style.display = "block";
-
-      instructions.innerHTML =
-        "🎯 Dragging... Release to capture<br><small>Press ESC to cancel</small>";
-      e.preventDefault();
+    // Event handlers with error catching
+    overlay.onmousedown = (e) => {
+      try {
+        console.log("🖱️ CONTENT: Mouse down at", e.clientX, e.clientY);
+        isSelecting = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        selectionBox.style.left = startX + "px";
+        selectionBox.style.top = startY + "px";
+        selectionBox.style.width = "0px";
+        selectionBox.style.height = "0px";
+        selectionBox.style.display = "block";
+        instructions.innerHTML = "🎯 Dragging... Release to capture";
+        e.preventDefault();
+        e.stopPropagation();
+      } catch (error) {
+        console.error("❌ CONTENT: Mouse down error:", error);
+      }
     };
 
-    overlay.onmousemove = function (e) {
+    overlay.onmousemove = (e) => {
       if (!isSelecting) return;
-
-      const currentX = e.clientX;
-      const currentY = e.clientY;
-      const left = Math.min(startX, currentX);
-      const top = Math.min(startY, currentY);
-      const width = Math.abs(currentX - startX);
-      const height = Math.abs(currentY - startY);
-
-      selectionBox.style.left = left + "px";
-      selectionBox.style.top = top + "px";
-      selectionBox.style.width = width + "px";
-      selectionBox.style.height = height + "px";
-
-      instructions.innerHTML = `📏 Size: ${Math.round(width)} × ${Math.round(
-        height
-      )}px<br><small>Release to capture</small>`;
+      try {
+        const width = Math.abs(e.clientX - startX);
+        const height = Math.abs(e.clientY - startY);
+        selectionBox.style.left = Math.min(startX, e.clientX) + "px";
+        selectionBox.style.top = Math.min(startY, e.clientY) + "px";
+        selectionBox.style.width = width + "px";
+        selectionBox.style.height = height + "px";
+        instructions.innerHTML = `📏 ${Math.round(width)} × ${Math.round(
+          height
+        )}px<br><small>Release to capture</small>`;
+      } catch (error) {
+        console.error("❌ CONTENT: Mouse move error:", error);
+      }
     };
 
-    overlay.onmouseup = function (e) {
+    overlay.onmouseup = (e) => {
       if (!isSelecting) return;
+      isSelecting = false;
 
-      console.log("🖱️ SNIP: Mouse up");
-      const rect = selectionBox.getBoundingClientRect();
+      try {
+        console.log("🖱️ CONTENT: Mouse up, processing selection");
+        const rect = selectionBox.getBoundingClientRect();
 
-      if (rect.width > 20 && rect.height > 20) {
-        instructions.innerHTML =
-          "✅ Capturing...<br><small>Please wait</small>";
-        instructions.style.borderColor = "#00ff88";
+        if (rect.width > 20 && rect.height > 20) {
+          instructions.innerHTML = "✅ Capturing... Please wait";
+          instructions.style.borderColor = "#00ff88";
 
-        // Send capture coordinates with proper error handling
-        const coordinates = {
-          x: rect.left,
-          y: rect.top,
-          width: rect.width,
-          height: rect.height,
-        };
+          const coordinates = {
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+          };
 
-        console.log("📸 SNIP: Sending capture coordinates:", coordinates);
+          console.log(
+            "📸 CONTENT: Sending CAPTURE_AREA with coordinates:",
+            coordinates
+          );
 
-        chrome.runtime.sendMessage(
-          {
-            type: "CAPTURE_AREA",
-            coordinates: coordinates,
-          },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              console.error(
-                "SNIP: Error sending capture message:",
-                chrome.runtime.lastError
-              );
-            } else {
-              console.log(
-                "✅ SNIP: Capture message sent successfully:",
-                response
-              );
+          // Send capture message with error handling
+          chrome.runtime.sendMessage(
+            {
+              type: "CAPTURE_AREA",
+              coordinates: coordinates,
+              timestamp: Date.now(),
+              url: window.location.href,
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                console.error(
+                  "❌ CONTENT: Error sending capture message:",
+                  chrome.runtime.lastError
+                );
+              } else {
+                console.log(
+                  "✅ CONTENT: Capture message sent, response:",
+                  response
+                );
+              }
             }
-          }
-        );
+          );
 
-        // Show success and remove overlay after delay
-        setTimeout(() => {
-          showWebpageSuccess(rect);
-          if (overlay) {
-            overlay.remove();
+          // Remove overlay after a delay
+          setTimeout(() => {
+            try {
+              if (overlay && overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+                overlay = null;
+              }
+              window[SCRIPT_ID] = false; // Allow re-injection
+            } catch (error) {
+              console.error("❌ CONTENT: Error removing overlay:", error);
+            }
+          }, 1000);
+        } else {
+          instructions.innerHTML = "❌ Area too small! Try again";
+          instructions.style.borderColor = "#ff4444";
+          selectionBox.style.display = "none";
+
+          setTimeout(() => {
+            instructions.innerHTML =
+              "✂️ Click and drag to select area<br><small>Press ESC to cancel</small>";
+            instructions.style.borderColor = "#bbff00";
+          }, 2000);
+        }
+      } catch (error) {
+        console.error("❌ CONTENT: Mouse up error:", error);
+      }
+    };
+
+    // ESC key handler
+    const escapeHandler = (e) => {
+      if (e.key === "Escape" && overlay) {
+        console.log("⌨️ CONTENT: ESC pressed, removing overlay");
+        try {
+          if (overlay && overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
             overlay = null;
           }
-        }, 500);
-      } else {
-        instructions.innerHTML =
-          "❌ Too small! Try again<br><small>Click and drag larger area</small>";
-        instructions.style.borderColor = "#ff4444";
-        selectionBox.style.display = "none";
-
-        setTimeout(() => {
-          instructions.innerHTML =
-            "✂️ Click and drag to select area<br><small>Press ESC to cancel</small>";
-          instructions.style.borderColor = "#bbff00";
-        }, 2000);
-      }
-
-      isSelecting = false;
-    };
-
-    // ESC key
-    document.onkeydown = function (e) {
-      if (e.key === "Escape" && overlay) {
-        console.log("⌨️ SNIP: ESC pressed");
-        overlay.remove();
-        overlay = null;
+          document.removeEventListener("keydown", escapeHandler);
+          window[SCRIPT_ID] = false; // Allow re-injection
+        } catch (error) {
+          console.error("❌ CONTENT: Error in escape handler:", error);
+        }
       }
     };
+
+    document.addEventListener("keydown", escapeHandler);
+
+    // Add overlay to page
+    try {
+      document.body.appendChild(overlay);
+      console.log("✅ CONTENT: Overlay added to page successfully");
+    } catch (error) {
+      console.error("❌ CONTENT: Failed to add overlay to page:", error);
+      throw error;
+    }
   }
 
-  // Show success on webpage
-  function showWebpageSuccess(rect) {
-    const success = document.createElement("div");
-    success.style.cssText = `
-      position: fixed !important;
-      top: 20px !important;
-      right: 20px !important;
-      background: linear-gradient(135deg, #00ff88, #4CAF50) !important;
-      color: #000 !important;
-      padding: 20px 30px !important;
-      border-radius: 15px !important;
-      font-weight: bold !important;
-      z-index: 2147483647 !important;
-      font-family: Arial, sans-serif !important;
-      border: 3px solid #fff !important;
-      box-shadow: 0 8px 32px rgba(0, 255, 136, 0.8) !important;
-    `;
+  console.log("✅ CONTENT: Robust snip script loaded successfully");
+  // UPDATED message listener in robustSnipScript - Add TEST_CONNECTION handling
+  window.glyphieMessageListener = (message, sender, sendResponse) => {
+    console.log("📨 CONTENT: Received message:", message.type, "from:", sender);
 
-    success.innerHTML = `
-      <div style="text-align: center;">
-        <div style="font-size: 18px; margin-bottom: 8px;">✅ Snip Captured!</div>
-        <div style="font-size: 12px;">
-          Size: ${Math.round(rect.width)}×${Math.round(rect.height)}px
-        </div>
-        <div style="font-size: 11px; margin-top: 5px;">
-          Processing...
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(success);
-
-    setTimeout(() => {
-      if (success.parentNode) {
-        success.parentNode.removeChild(success);
-      }
-    }, 4000);
-
-    console.log("✅ SNIP: Success notification shown");
-  }
-
-  console.log("✅ SNIP: Full script setup complete");
-}
-
-// SINGLE message listener for capture - FIXED
-// ENHANCED message listener - Reset UI after capture
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("🔍 POPUP MESSAGE RECEIVED:", message);
-
-  if (message.type === "CAPTURE_AREA") {
-    console.log("📸 CAPTURE_AREA message received!");
-    console.log("📸 Coordinates:", message.coordinates);
-
-    // Reset snip button UI
-    const snipBtn =
-      document.getElementById("active-snip-btn") ||
-      document.querySelector("#snip-btn");
-    if (snipBtn) {
-      snipBtn.textContent = "Snip ✂️";
-      snipBtn.disabled = false;
-      snipBtn.style.opacity = "1";
+    if (message.type === "TEST_CONNECTION") {
+      console.log("📨 CONTENT: Responding to connection test");
+      sendResponse({
+        success: true,
+        message: "Content script is active",
+        timestamp: Date.now(),
+        url: window.location.href,
+      });
+      return false;
     }
 
-    // Call capture function
-    captureScreenshotArea(message.coordinates);
+    if (message.type === "START_SNIP") {
+      console.log("📨 CONTENT: Processing START_SNIP request");
 
-    sendResponse({ received: true, status: "capture started" });
-  }
+      try {
+        createOverlay();
+        console.log("✅ CONTENT: Overlay created successfully");
 
-  return true; // Keep channel open for async response
-});
+        sendResponse({
+          success: true,
+          message: "Overlay created",
+          timestamp: Date.now(),
+          url: window.location.href,
+        });
 
-// ROBUST captureScreenshotArea - Add delays and error handling
+        return false;
+      } catch (error) {
+        console.error("❌ CONTENT: Error creating overlay:", error);
+        sendResponse({
+          success: false,
+          error: error.message,
+          timestamp: Date.now(),
+        });
+        return false;
+      }
+    }
+
+    console.log("📨 CONTENT: Unknown message type:", message.type);
+    return false;
+  };
+}
+
+// ROBUST captureScreenshotArea - Replace existing one
 async function captureScreenshotArea(coordinates) {
-  console.log("📸 ROBUST CAPTURE: Starting with coordinates:", coordinates);
+  console.log("📸 CAPTURE: Starting with coordinates:", coordinates);
 
   try {
-    // Add delay for stability
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Get tab with retry
+    let tab;
+    for (let i = 0; i < 3; i++) {
+      const tabs = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      if (tabs[0]) {
+        tab = tabs[0];
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
 
-    // Get tab
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    console.log("📸 Got tab:", tab.id);
+    if (!tab) throw new Error("No active tab found");
 
-    // Capture screenshot with delay
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
-      format: "png",
-      quality: 100,
-    });
-    console.log("📸 Screenshot captured, length:", dataUrl.length);
+    console.log("📸 CAPTURE: Got tab:", tab.id);
 
-    // Crop image with delay
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Capture with retry
+    let dataUrl;
+    for (let i = 0; i < 3; i++) {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 300)); // Wait for page to settle
+        dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+          format: "png",
+          quality: 100,
+        });
+        if (dataUrl) break;
+      } catch (error) {
+        console.warn(`📸 CAPTURE: Attempt ${i + 1} failed:`, error);
+        if (i === 2) throw error;
+      }
+    }
+
+    console.log("📸 CAPTURE: Screenshot taken, cropping...");
+
+    // Crop image
     const croppedImage = await cropImage(dataUrl, coordinates);
-    console.log("📸 Image cropped, length:", croppedImage.length);
+    console.log("📸 CAPTURE: Image cropped");
 
     // Create snip data
     const snipData = {
@@ -439,80 +642,85 @@ async function captureScreenshotArea(coordinates) {
       pageUrl: tab.url,
     };
 
-    console.log("📸 Created snip data with ID:", snipData.id);
+    // Save with verification
+    const saved = localStorage.getItem("glyphie-snips");
+    const existingSnips = saved ? JSON.parse(saved) : [];
+    existingSnips.push(snipData);
 
-    // Save to localStorage with retry
-    let saveSuccess = false;
-    let saveAttempts = 0;
+    localStorage.setItem("glyphie-snips", JSON.stringify(existingSnips));
 
-    while (!saveSuccess && saveAttempts < 3) {
-      try {
-        const saved = localStorage.getItem("glyphie-snips");
-        const existingSnips = saved ? JSON.parse(saved) : [];
-        existingSnips.push(snipData);
+    // Verify save
+    const verification = localStorage.getItem("glyphie-snips");
+    const verifiedSnips = verification ? JSON.parse(verification) : [];
 
-        localStorage.setItem("glyphie-snips", JSON.stringify(existingSnips));
-
-        // Verify save
-        const verification = localStorage.getItem("glyphie-snips");
-        const verifySnips = verification ? JSON.parse(verification) : [];
-
-        if (verifySnips.find((s) => s.id === snipData.id)) {
-          saveSuccess = true;
-          storedSnips = verifySnips;
-          console.log("📸 SAVED TO STORAGE! Total snips:", verifySnips.length);
-        } else {
-          throw new Error("Verification failed");
-        }
-      } catch (error) {
-        saveAttempts++;
-        console.warn(`⚠️ Save attempt ${saveAttempts} failed:`, error);
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      }
+    if (!verifiedSnips.find((s) => s.id === snipData.id)) {
+      throw new Error("Failed to save snip to storage");
     }
 
-    if (!saveSuccess) {
-      throw new Error("Failed to save to localStorage after multiple attempts");
+    storedSnips = verifiedSnips;
+    console.log(
+      "📸 CAPTURE: Saved successfully! Total snips:",
+      verifiedSnips.length
+    );
+
+    // Update UI
+    const snipBtn =
+      document.getElementById("active-snip-btn") ||
+      document.querySelector("#snip-btn");
+    if (snipBtn) {
+      snipBtn.textContent = "✅ Captured!";
+      snipBtn.style.background = "green";
+      snipBtn.disabled = false;
+
+      setTimeout(() => {
+        snipBtn.textContent = "Snip ✂️";
+        snipBtn.style.background = "";
+      }, 2000);
     }
 
-    // Update UI with delay
+    // Refresh gallery
     setTimeout(() => {
-      const snipBtn =
-        document.getElementById("active-snip-btn") ||
-        document.querySelector("#snip-btn");
-      if (snipBtn) {
-        snipBtn.textContent = "✅ Captured!";
-        snipBtn.style.background = "green";
-        setTimeout(() => {
-          snipBtn.textContent = "Snip ✂️";
-          snipBtn.style.background = "";
-        }, 2000);
-      }
-    }, 100);
-
-    // Force refresh gallery with multiple attempts
-    const refreshGallery = () => {
       const activeSection = document.getElementById("active-snip-section");
       if (activeSection) {
-        console.log("📸 Forcing gallery refresh...");
+        console.log("📸 CAPTURE: Refreshing gallery...");
         updateGallery(activeSection);
       }
-    };
+    }, 500);
 
-    setTimeout(refreshGallery, 300);
-    setTimeout(refreshGallery, 800);
-    setTimeout(refreshGallery, 1500);
-
-    console.log("📸 CAPTURE COMPLETE!");
+    console.log("📸 CAPTURE: Complete!");
   } catch (error) {
-    console.error("❌ ROBUST CAPTURE ERROR:", error);
-    alert("Capture failed: " + error.message);
+    console.error("❌ CAPTURE ERROR:", error);
+
+    // Reset UI on error
+    const snipBtn =
+      document.getElementById("active-snip-btn") ||
+      document.querySelector("#snip-btn");
+    if (snipBtn) {
+      snipBtn.textContent = "❌ Failed - Try Again";
+      snipBtn.style.background = "red";
+      snipBtn.disabled = false;
+
+      setTimeout(() => {
+        snipBtn.textContent = "Snip ✂️";
+        snipBtn.style.background = "";
+      }, 3000);
+    }
+
+    throw error;
   }
 }
 
-// FIXED init function - Better navigation logic
+// UPDATE your init function - Add expand button listener
 function init() {
   console.log("🔧 INIT: Extension initializing...");
+
+  // Add expand button listener
+  const expandBtn = document.getElementById("minimized-expand-btn");
+  if (expandBtn) {
+    expandBtn.addEventListener("click", expandPopup);
+  }
+
+  // ... rest of your existing init function code ...
 
   // Check flags FIRST before setting up other listeners
   const gotoSnip = localStorage.getItem("glyphie-goto-snip");
@@ -629,95 +837,93 @@ function renderSnip() {
   setTimeout(refreshGallery, 1000);
 }
 
-// ROBUST updateGallery - Add delays for stability
-function updateGallery(container) {
-  console.log("🔄 ROBUST GALLERY UPDATE");
+// UPDATED updateGallery - Use chrome.storage with debugging
+async function updateGallery(container) {
+  console.log("🔄 GALLERY: Starting update");
 
-  // Add small delay to ensure DOM is ready
-  setTimeout(() => {
-    const gallery = container.querySelector(".snip-gallery");
-    if (!gallery) {
-      console.log("❌ No gallery found, retrying...");
-      setTimeout(() => updateGallery(container), 500);
-      return;
+  const gallery = container.querySelector(".snip-gallery");
+  if (!gallery) {
+    console.log("❌ GALLERY: No gallery found");
+    return;
+  }
+
+  // Load from chrome.storage
+  try {
+    await loadStoredSnips(); // This now uses chrome.storage
+    console.log("🔄 GALLERY: Loaded", storedSnips.length, "snips from storage");
+  } catch (error) {
+    console.error("❌ GALLERY: Error loading snips:", error);
+    return;
+  }
+
+  gallery.innerHTML = "";
+
+  if (storedSnips.length === 0) {
+    console.log("🔄 GALLERY: No snips to display");
+    gallery.innerHTML = `
+      <div style="text-align: center; padding: 20px; color: #666;">
+        <div style="font-size: 3em;">📷</div>
+        <div>No snips yet - check browser console for debug info</div>
+        <button onclick="console.log('Current snips:', ${JSON.stringify(
+          storedSnips
+        )})" 
+                style="margin-top: 10px; padding: 5px 10px; background: #333; color: #fff; border: none; border-radius: 4px;">
+          Debug Storage
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  console.log("🔄 GALLERY: Creating", storedSnips.length, "gallery items");
+
+  // Create items
+  storedSnips.reverse().forEach((snip, index) => {
+    console.log(`🔄 GALLERY: Creating item ${index + 1}:`, snip.id);
+
+    const item = document.createElement("div");
+    item.style.cssText = `
+      background: #333; border: 2px solid #555; border-radius: 8px;
+      padding: 8px; margin: 4px; cursor: pointer; position: relative;
+    `;
+
+    if (selectedSnips.includes(snip.id)) {
+      item.style.borderColor = "#bbff00";
     }
 
-    // Get fresh snips with retry
-    let snips = [];
-    try {
-      const saved = localStorage.getItem("glyphie-snips");
-      snips = saved ? JSON.parse(saved) : [];
-      storedSnips = snips;
-    } catch (error) {
-      console.error("❌ Error parsing snips:", error);
-      return;
-    }
+    item.innerHTML = `
+      <img src="${snip.data}" 
+           style="width: 100px; height: 60px; object-fit: cover; border-radius: 4px; display: block;"
+           alt="Snip ${index + 1}"
+           onload="console.log('✅ Image ${index + 1} loaded successfully')"
+           onerror="console.error('❌ Image ${index + 1} failed to load')">
+      <div style="text-align: center; font-size: 11px; color: #ccc; margin-top: 4px;">
+        ${snip.dimensions.width} × ${snip.dimensions.height}
+      </div>
+      <button onclick="this.parentElement.remove(); console.log('🗑️ Removed snip ${
+        snip.id
+      }')" 
+              style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 10px;">×</button>
+    `;
 
-    console.log("🔄 Found", snips.length, "snips in storage");
+    item.onclick = (e) => {
+      if (e.target.tagName === "BUTTON") return;
+      const idx = selectedSnips.indexOf(snip.id);
+      if (idx > -1) {
+        selectedSnips.splice(idx, 1);
+        item.style.borderColor = "#555";
+        console.log("📤 Deselected snip:", snip.id);
+      } else {
+        selectedSnips.push(snip.id);
+        item.style.borderColor = "#bbff00";
+        console.log("📥 Selected snip:", snip.id);
+      }
+    };
 
-    gallery.innerHTML = "";
+    gallery.appendChild(item);
+  });
 
-    if (snips.length === 0) {
-      gallery.innerHTML = `
-        <div style="text-align: center; padding: 20px; color: #666;">
-          <div style="font-size: 3em;">📷</div>
-          <div>No snips yet</div>
-        </div>
-      `;
-      return;
-    }
-
-    // Create items with small delays
-    snips.reverse().forEach((snip, index) => {
-      setTimeout(() => {
-        console.log(`🔄 Creating gallery item ${index + 1}`);
-
-        const item = document.createElement("div");
-        item.style.cssText = `
-          background: #333;
-          border: 2px solid #555;
-          border-radius: 8px;
-          padding: 8px;
-          margin: 4px;
-          cursor: pointer;
-          position: relative;
-        `;
-
-        if (selectedSnips.includes(snip.id)) {
-          item.style.borderColor = "#bbff00";
-        }
-
-        item.innerHTML = `
-          <img src="${snip.data}" 
-               style="width: 100px; height: 60px; object-fit: cover; border-radius: 4px; display: block;"
-               alt="Snip ${index + 1}">
-          <div style="text-align: center; font-size: 11px; color: #ccc; margin-top: 4px;">
-            ${snip.dimensions.width} × ${snip.dimensions.height}
-          </div>
-          <button onclick="this.parentElement.remove()" 
-                  style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 10px;">×</button>
-        `;
-
-        item.onclick = (e) => {
-          if (e.target.tagName === "BUTTON") return;
-
-          const idx = selectedSnips.indexOf(snip.id);
-          if (idx > -1) {
-            selectedSnips.splice(idx, 1);
-            item.style.borderColor = "#555";
-          } else {
-            selectedSnips.push(snip.id);
-            item.style.borderColor = "#bbff00";
-          }
-          console.log("Selected snips:", selectedSnips);
-        };
-
-        gallery.appendChild(item);
-      }, index * 50); // Small delay between each item
-    });
-
-    console.log("✅ Gallery update initiated");
-  }, 100);
+  console.log("✅ GALLERY: Update completed");
 }
 
 // Crop image function
@@ -824,6 +1030,40 @@ function setupSnipEventListeners(snipContainer) {
       updateGallery(snipContainer);
     });
   }
+
+  // Debug buttons
+  const debugClear = snipContainer.querySelector("#debug-clear-snips");
+  if (debugClear) {
+    debugClear.addEventListener("click", () => {
+      localStorage.removeItem("glyphie-snips");
+      storedSnips = [];
+      selectedSnips = [];
+      updateGallery(snipContainer);
+      console.log("🗑️ Cleared all snips");
+    });
+  }
+
+  const debugShow = snipContainer.querySelector("#debug-show-snips");
+  if (debugShow) {
+    debugShow.addEventListener("click", () => {
+      const saved = localStorage.getItem("glyphie-snips");
+      const snips = saved ? JSON.parse(saved) : [];
+      console.log("📊 STORAGE DEBUG:");
+      console.log("Raw localStorage:", saved);
+      console.log("Parsed snips:", snips);
+      console.log("Global storedSnips:", storedSnips);
+      console.log("Selected snips:", selectedSnips);
+      alert(`Storage has ${snips.length} snips. Check console for details.`);
+    });
+  }
+
+  const debugRefresh = snipContainer.querySelector("#debug-refresh-gallery");
+  if (debugRefresh) {
+    debugRefresh.addEventListener("click", () => {
+      console.log("🔄 Manual gallery refresh triggered");
+      updateGallery(snipContainer);
+    });
+  }
 }
 
 // Create snip gallery
@@ -843,74 +1083,6 @@ function createSnipGallery(container) {
   }
 
   updateGallery(container);
-}
-
-// UPDATED updateGallery - COMPLETE VERSION
-function updateGallery(container) {
-  const gallery = container.querySelector(".snip-gallery");
-  if (!gallery) return;
-
-  // ALWAYS load fresh from localStorage
-  const saved = localStorage.getItem("glyphie-snips");
-  const freshSnips = saved ? JSON.parse(saved) : [];
-  storedSnips = freshSnips; // Update global variable
-
-  console.log("🔄 Updating gallery with", storedSnips.length, "snips");
-
-  gallery.innerHTML = "";
-
-  if (storedSnips.length === 0) {
-    gallery.innerHTML = `
-      <div style="grid-column: 1/-1; text-align: center; color: var(--accent-color); padding: 20px;">
-        <div style="font-size: 2em; margin-bottom: 10px;">📷</div>
-        <div>No snips yet. Click the Snip ✂️ button to start!</div>
-      </div>
-    `;
-    return;
-  }
-
-  // Show newest snips first
-  const sortedSnips = [...storedSnips].reverse();
-
-  sortedSnips.forEach((snip) => {
-    const item = document.createElement("div");
-    item.className = "snip-item";
-    if (selectedSnips.includes(snip.id)) {
-      item.classList.add("selected");
-    }
-
-    item.innerHTML = `
-      <img class="snip-thumbnail" src="${snip.data}" alt="Snip ${snip.id}">
-      <div class="snip-info">${snip.dimensions.width}×${snip.dimensions.height}</div>
-      <button class="snip-remove">×</button>
-    `;
-
-    // Click to select/deselect
-    item.addEventListener("click", (e) => {
-      if (e.target.classList.contains("snip-remove")) {
-        // Remove snip
-        const updatedSnips = storedSnips.filter((s) => s.id !== snip.id);
-        localStorage.setItem("glyphie-snips", JSON.stringify(updatedSnips));
-        storedSnips = updatedSnips;
-        selectedSnips = selectedSnips.filter((id) => id !== snip.id);
-        updateGallery(container);
-        return;
-      }
-
-      // Toggle selection
-      const index = selectedSnips.indexOf(snip.id);
-      if (index > -1) {
-        selectedSnips.splice(index, 1);
-      } else {
-        selectedSnips.push(snip.id);
-      }
-      updateGallery(container);
-    });
-
-    gallery.appendChild(item);
-  });
-
-  console.log("✅ Gallery updated successfully");
 }
 
 // UPDATED handleSnipSend - Send images to Crestal API
@@ -1282,26 +1454,6 @@ function renderAttachmentPreview() {
 
 // === INITIALIZATION ===
 
-function init() {
-  sidebarButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      sidebarButtons.forEach((btn) => btn.classList.remove("active"));
-      button.classList.add("active");
-      const section = button.getAttribute("data-section");
-      loadSection(section);
-
-      const sidebar = document.getElementById("sidebar");
-      const toggleBtn = document.getElementById("sidebar-toggle");
-      if (sidebar.classList.contains("open")) {
-        sidebar.classList.remove("open");
-        toggleBtn.textContent = "☰";
-      }
-    });
-  });
-  loadSection("characters");
-  applySavedTheme();
-}
-
 function applySavedTheme() {
   const savedTheme = localStorage.getItem("theme") || "dark";
   document.body.classList.toggle("light", savedTheme === "light");
@@ -1330,76 +1482,6 @@ function loadSection(section) {
       break;
     default:
       mainContent.textContent = "This section is not available.";
-  }
-}
-
-// ENHANCED renderSnip - Aggressive gallery refresh
-function renderSnip() {
-  console.log("🔍 Debug: renderSnip() called");
-
-  // Check for new snip with more robust detection
-  const newSnipFlag = localStorage.getItem("glyphie-new-snip");
-  let forceRefresh = false;
-
-  if (newSnipFlag) {
-    try {
-      const flagData = JSON.parse(newSnipFlag);
-      // If snip was added in last 10 seconds, force refresh
-      if (Date.now() - flagData.timestamp < 10000) {
-        forceRefresh = true;
-        console.log("🆕 Recent snip detected, will force refresh");
-      }
-    } catch (e) {
-      forceRefresh = true; // Fallback for old format
-    }
-    localStorage.removeItem("glyphie-new-snip");
-  }
-
-  const snipSection = document.getElementById("snip-section");
-  if (!snipSection) {
-    console.log("❌ Still can't find snip section");
-    mainContent.textContent = "❌ Snip section unavailable.";
-    return;
-  }
-
-  console.log("✅ Found snip section, proceeding...");
-
-  mainContent.innerHTML = "";
-  const snipClone = snipSection.cloneNode(true);
-  snipClone.classList.remove("hidden");
-  snipClone.id = "active-snip-section";
-  mainContent.appendChild(snipClone);
-
-  // Add event listeners
-  setupSnipEventListeners(snipClone);
-
-  // AGGRESSIVE GALLERY REFRESH
-  const refreshWithDelay = (delay, attempt) => {
-    setTimeout(() => {
-      console.log(`🔄 Gallery refresh attempt ${attempt} (${delay}ms delay)`);
-      updateGallery(snipClone);
-
-      // Check if images actually loaded
-      setTimeout(() => {
-        const images = snipClone.querySelectorAll(".snip-thumbnail");
-        images.forEach((img, index) => {
-          if (img.naturalWidth === 0) {
-            console.warn(`⚠️ Image ${index + 1} not loaded, retrying...`);
-            img.src = img.src + "?retry=" + Date.now(); // Force reload
-          }
-        });
-      }, 500);
-    }, delay);
-  };
-
-  // Multiple refresh attempts
-  refreshWithDelay(0, 1); // Immediate
-  refreshWithDelay(100, 2); // 100ms
-  refreshWithDelay(500, 3); // 500ms
-  refreshWithDelay(1000, 4); // 1s
-
-  if (forceRefresh) {
-    refreshWithDelay(2000, 5); // Extra refresh for new snips
   }
 }
 
@@ -1901,25 +1983,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
-// TEMPORARY: Add this test function to verify message flow
-window.testSnipCapture = function () {
-  console.log("🧪 TEST: Simulating capture message...");
-
-  const testCoordinates = {
-    x: 100,
-    y: 100,
-    width: 200,
-    height: 150,
-  };
-
-  // Simulate the message that should come from content script
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    // This listener should already exist, just testing
-  });
-
-  // Call capture directly
-  captureScreenshotArea(testCoordinates);
-};
 
 // NEW: Load chat history for snip conversations
 async function loadSnipChatHistory(chatHistoryDiv) {
@@ -1985,6 +2048,61 @@ async function loadSnipChatHistory(chatHistoryDiv) {
       </div>
     `;
   }
+}
+// ADD this message listener to popup.js (for cropping images)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "CROP_IMAGE") {
+    console.log("✂️ POPUP: Received crop request");
+
+    cropImage(message.dataUrl, message.coordinates)
+      .then((croppedImage) => {
+        console.log("✂️ POPUP: Cropping completed");
+        sendResponse({ success: true, croppedImage: croppedImage });
+      })
+      .catch((error) => {
+        console.error("✂️ POPUP: Cropping failed:", error);
+        sendResponse({ success: false, error: error.message });
+      });
+
+    return true; // Keep channel open for async response
+  }
+});
+
+// Your existing cropImage function should work fine in popup context
+function cropImage(dataUrl, coordinates) {
+  return new Promise((resolve) => {
+    console.log("✂️ POPUP: Starting crop operation");
+
+    const img = new Image();
+    img.onload = () => {
+      console.log("✂️ POPUP: Image loaded, creating canvas");
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = coordinates.width;
+      canvas.height = coordinates.height;
+
+      const ratio = window.devicePixelRatio || 1;
+
+      ctx.drawImage(
+        img,
+        coordinates.x * ratio,
+        coordinates.y * ratio,
+        coordinates.width * ratio,
+        coordinates.height * ratio,
+        0,
+        0,
+        coordinates.width,
+        coordinates.height
+      );
+
+      const result = canvas.toDataURL("image/png");
+      console.log("✂️ POPUP: Crop completed, size:", result.length);
+      resolve(result);
+    };
+    img.src = dataUrl;
+  });
 }
 
 document.addEventListener("DOMContentLoaded", init);
