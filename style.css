@@ -19,11 +19,11 @@ body {
   --sidebar-width: 250px;
   --accent-color: rgb(187, 255, 0);
   --text-color: #f0f0f0;
-  --background-color: #111;
+  --background-color: black;
   --button-bg: #333;
-  --button-hover: #555;
+  --button-hover: black;
   --background-alt: #181818;
-  --user-bubble-bg: #111;
+  --user-bubble-bg: black;
   --bot-bubble-bg: #181818;
   --msg-border-radius: 15px;
   --bot-message-bg: #091013;
@@ -31,13 +31,13 @@ body {
 
 body.light {
   --accent-color: #5a00b0;
-  --text-color: #111;
+  --text-color: black;
   --background-color: #fefefe;
   --button-bg: #ddd;
   --button-hover: #bbb;
   --bot-message-bg: #f1f1f1;
   background-color: #ffffff;
-  color: #111111;
+  color: black111;
 }
 
 /* === CONTAINER === */
@@ -131,7 +131,7 @@ body.light #sidebar {
 body.light .nav-btn {
   background-color: #fff;
   border: 2px solid #bbb;
-  color: #111;
+  color: black;
 }
 
 body.light .nav-btn:hover {
@@ -270,17 +270,17 @@ body.light .nav-btn.active {
 
 body.light .character-card {
   background-color: #fdfdfd;
-  color: #111;
+  color: black;
   border: 1.5px solid #ccc;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 body.light .character-name {
-  color: #222;
+  color: black;
 }
 
 body.light .character-bio {
-  color: #555;
+  color: black;
 }
 
 body.light .select-btn {
@@ -352,7 +352,7 @@ body.light .select-btn:hover {
   box-shadow: 0 2px 16px #0006 inset;
   scroll-behavior: smooth;
   box-sizing: border-box;
-  scrollbar-color: var(--accent-color) #111;
+  scrollbar-color: var(--accent-color) black;
   scrollbar-width: thin;
 }
 
@@ -360,14 +360,14 @@ body.light .select-btn:hover {
 .chat-history::-webkit-scrollbar,
 .attachment-preview::-webkit-scrollbar {
   width: 11px;
-  background: #111;
+  background: black;
 }
 
 .chat-history::-webkit-scrollbar-thumb,
 .attachment-preview::-webkit-scrollbar-thumb {
   background: var(--accent-color);
   border-radius: 6px;
-  border: 3px solid #111;
+  border: 3px solid black;
 }
 
 .chat-history::-webkit-scrollbar-thumb:hover {
@@ -384,7 +384,7 @@ body.light .select-btn:hover {
   line-height: 1.6;
   word-break: break-word;
   max-width: 85%;
-  box-shadow: 0 2px 9px #1111;
+  box-shadow: 0 2px 9px black1;
 }
 
 .message.user {
@@ -704,7 +704,7 @@ input:checked + .slider::before {
 
 body.light .toggle-label,
 body.light .theme-label {
-  color: #222;
+  color: black;
 }
 
 .toggle-input {
@@ -745,7 +745,7 @@ body.light .theme-label {
 
 .toggle-input:checked + .custom-slider::before {
   transform: translateX(24px);
-  background: #222;
+  background: black;
 }
 
 /* === SNIP BOX STYLE === */
@@ -828,7 +828,7 @@ body.light .theme-label {
 .message.system {
   background: #333;
   color: #ccc;
-  border: 2px solid #555;
+  border: 2px solid black;
   font-style: italic;
   max-width: 90%;
   margin: 0 auto;
@@ -995,7 +995,7 @@ body.light .theme-label {
 #active-snip-input:focus {
   border-color: #fff !important;
   box-shadow: 0 0 15px rgba(187, 255, 0, 0.5) !important;
-  background: #111 !important;
+  background: black !important;
 }
 
 #snip-chat-input::placeholder,
@@ -1297,7 +1297,7 @@ body.light .theme-label {
 /* === NEW SNIP HIGHLIGHT ANIMATIONS === */
 @keyframes newSnipPulse {
   0% {
-    border-color: #555;
+    border-color: black;
     box-shadow: 0 0 5px rgba(0, 255, 136, 0.3);
     transform: scale(1);
   }
@@ -1331,4 +1331,94 @@ body.light .theme-label {
 .snip-item-enhanced:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+/* Pitch black dark background and container */
+
+.home-container {
+  margin: 20px;
+  border: 5px solid rgb(187, 255, 0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 90vh;
+  background: var(--background-color, #000);
+  color: var(--text-color, #fff);
+  padding: 20px;
+}
+.home-container .actions {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.home-container .action-item {
+  background: var(--button-bg, black);
+  border: 2px solid var(--accent-color, rgb(187, 255, 0));
+  border-radius: 24px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: none;
+  transition: background 0.25s, border-color 0.25s;
+}
+
+.home-container .action-item:hover,
+.home-container .action-item:focus-within {
+  background: var(--accent-color, rgb(187, 255, 0));
+  border-color: var(--accent-color, rgb(187, 255, 0));
+}
+
+.home-container .action-label {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent-color, rgb(187, 255, 0));
+  margin-bottom: 8px;
+}
+
+.home-container .action-desc {
+  font-size: 1rem;
+  color: var(--text-secondary, #afafaf);
+  margin-bottom: 16px;
+  max-width: 320px;
+  user-select: none;
+}
+
+.home-container .action-item button {
+  background: var(--button-bg, black);
+  color: var(--accent-color, rgb(187, 255, 0));
+  border: 2px solid var(--accent-color, rgb(187, 255, 0));
+  border-radius: 24px;
+  padding: 10px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s, color 0.3s;
+  width: 140px;
+}
+
+.home-container .action-item button:hover,
+.home-container .action-item button:focus {
+  background: var(--accent-color, rgb(187, 255, 0));
+  color: black;
+  outline: none;
+  border: 2px solid var(--accent-color, rgb(187, 255, 0));
+}
+
+/* Responsive tweaks */
+@media (max-width: 500px) {
+  .home-container .actions {
+    gap: 18px;
+  }
+
+  .home-container .action-desc {
+    max-width: 100%;
+  }
+
+  .home-container .action-item button {
+    width: 100%;
+  }
 }

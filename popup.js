@@ -782,14 +782,14 @@ async function init() {
       }, 100);
     } else {
       console.log("🔧 INIT: Loading default characters section");
-      loadSection("characters");
+      loadSection("home");
     }
 
     applySavedTheme();
   } catch (error) {
     console.error("❌ INIT: Error checking navigation flags:", error);
     // Fallback to default behavior
-    loadSection("characters");
+    loadSection("home");
     applySavedTheme();
   }
 }
@@ -1575,6 +1575,9 @@ function loadSection(section) {
   currentChatId = null;
 
   switch (section) {
+    case "home": // ⬅⬅ NEW HOMEPAGE
+      renderHome();
+      break;
     case "characters":
       renderCharacters();
       break;
@@ -1590,6 +1593,78 @@ function loadSection(section) {
     default:
       mainContent.textContent = "This section is not available.";
   }
+}
+
+function renderHome() {
+  const container = document.createElement("div");
+  container.className = "home-container";
+  container.style.cssText = `
+    padding: 20px;
+    color: var(--text-color);
+    font-family: inherit;
+  `;
+
+  const heading = document.createElement("h1");
+  heading.textContent = "Welcome to Glyphie";
+  heading.style.cssText = `
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+    color: var(--accent-color);
+  `;
+
+  const subheading = document.createElement("p");
+  subheading.textContent =
+    "Your all-in-one assistant for snipping, chatting, and productivity.";
+  subheading.style.cssText = `
+    font-size: 1rem;
+    margin-bottom: 20px;
+    color: var(--text-color);
+  `;
+
+  // Quick action buttons
+  const buttonRow = document.createElement("div");
+  buttonRow.style.cssText = `
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  `;
+
+  const quickActions = [
+    { label: "🗂️ Explore Agents", section: "characters" },
+    { label: "✂️ New Snip", section: "snip" },
+    { label: "📊 Stats", section: "stats" },
+    { label: "⚙️ Settings", section: "settings" },
+  ];
+
+  quickActions.forEach((action) => {
+    const btn = document.createElement("button");
+    btn.textContent = action.label;
+    btn.style.cssText = `
+      padding: 10px 15px;
+      background: var(--button-bg);
+      color: var(--accent-color);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.3s;
+    `;
+    btn.addEventListener(
+      "mouseover",
+      () => (btn.style.background = "var(--button-hover-bg)")
+    );
+    btn.addEventListener(
+      "mouseout",
+      () => (btn.style.background = "var(--button-bg)")
+    );
+    btn.addEventListener("click", () => loadSection(action.section));
+    buttonRow.appendChild(btn);
+  });
+
+  container.appendChild(heading);
+  container.appendChild(subheading);
+  container.appendChild(buttonRow);
+  mainContent.appendChild(container);
 }
 
 function renderCharacters() {
