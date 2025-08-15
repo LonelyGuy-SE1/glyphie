@@ -1422,160 +1422,240 @@ body.light .theme-label {
     width: 100%;
   }
 }
-#thread-section {
-  margin-bottom: 20px;
-  padding: 10px;
+/* ─── Snip Thread Dropdown Bar ─────────────────────────── */
+#snip-thread-bar,
+#active-snip-thread-bar {
+  background: #1a1a1a;
   border: 2px solid var(--accent-color);
   border-radius: 10px;
-  background: black;
+  margin: 15px 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  transition: all 0.3s ease;
 }
 
-.thread-header {
+/* Header with dropdown button */
+.thread-header-dropdown {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  color: var(--accent-color);
-  font-weight: bold;
-  margin-bottom: 10px;
+  justify-content: space-between;
+  padding: 12px 15px;
+  background: linear-gradient(135deg, #2a2a2a, #1f1f1f);
+  border-bottom: 1px solid rgba(187, 255, 0, 0.2);
 }
 
-#new-thread-btn {
-  background: var(--accent-color);
-  color: black;
-  border: none;
-  border-radius: 6px;
-  font-size: 1.2em;
-  width: 28px;
-  height: 28px;
-  cursor: pointer;
-}
-
-#new-thread-btn:hover {
-  background: white;
-}
-
-#thread-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.thread-item {
+/* Main dropdown toggle button */
+.thread-dropdown-toggle {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  background: #121212;
-  color: var(--accent-color);
-  padding: 6px 8px;
-  border-radius: 6px;
-  margin-bottom: 5px;
-  cursor: pointer;
-}
-
-.thread-item:hover {
-  background: #1c1c1c;
-}
-
-.thread-delete-btn {
+  gap: 8px;
   background: none;
   border: none;
-  color: #ff2536;
-  font-size: 1.2em;
-  cursor: pointer;
-}
-
-.thread-delete-btn:hover {
-  color: white;
-}
-#thread-section {
-  margin-bottom: 10px;
-  padding: 10px;
-  border: 2px solid var(--accent-color);
-  border-radius: 10px;
-  background: black;
-}
-
-.thread-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   color: var(--accent-color);
-  font-weight: bold;
-  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: all 0.25s ease;
+  flex: 1;
+  text-align: left;
 }
 
-#new-thread-btn {
+.thread-dropdown-toggle:hover {
+  background: rgba(187, 255, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.thread-dropdown-icon {
+  font-size: 16px;
+}
+
+.thread-dropdown-text {
+  flex: 1;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.thread-dropdown-arrow {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+  color: rgba(187, 255, 0, 0.8);
+}
+
+/* Rotate arrow when open */
+#snip-thread-bar.dropdown-open .thread-dropdown-arrow,
+#active-snip-thread-bar.dropdown-open .thread-dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+/* Control buttons (refresh + new) */
+.thread-controls {
+  display: flex;
+  gap: 8px;
+}
+
+#refresh-threads-btn,
+#snip-new-thread-btn,
+#active-refresh-threads-btn,
+#active-snip-new-thread-btn {
   background: var(--accent-color);
-  color: black;
+  color: #000;
   border: none;
-  border-radius: 6px;
-  font-size: 1.2em;
-  width: 28px;
-  height: 28px;
-  cursor: pointer;
-}
-#new-thread-btn:hover {
-  background: white;
-}
-
-#thread-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.thread-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #121212;
-  color: var(--accent-color);
-  padding: 6px 8px;
-  border-radius: 6px;
-  margin-bottom: 5px;
-  cursor: pointer;
-}
-.thread-item:hover {
-  background: #1c1c1c;
-}
-.thread-section {
-  border: 2px solid var(--accent-color);
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
-  margin: 15px 20px;
-  background: #121212;
-  padding: 10px;
-  color: var(--accent-color);
-}
-
-.thread-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  font-size: 14px;
   font-weight: bold;
-  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.thread-list {
+#refresh-threads-btn:hover,
+#snip-new-thread-btn:hover,
+#active-refresh-threads-btn:hover,
+#active-snip-new-thread-btn:hover {
+  background: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(187, 255, 0, 0.4);
+}
+
+/* Dropdown content (thread list) */
+.thread-dropdown-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #161616;
   list-style: none;
-  padding: 0;
   margin: 0;
-  max-height: 150px;
-  overflow-y: auto;
+  padding: 0;
 }
 
-.thread-list .thread-item {
-  padding: 6px 8px;
+/* Show dropdown when open */
+#snip-thread-bar.dropdown-open .thread-dropdown-content,
+#active-snip-thread-bar.dropdown-open .thread-dropdown-content {
+  max-height: 200px;
+  padding: 10px 0;
+}
+
+/* Individual thread items */
+.thread-dropdown-content .thread-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 15px;
+  margin: 2px 8px;
   border-radius: 6px;
   cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
   background: transparent;
-  color: var(--accent-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  color: #ddd;
+  border: 1px solid transparent;
 }
 
-.thread-list .thread-item:hover {
-  background: #1c1c1c;
+.thread-dropdown-content .thread-item:hover {
+  background: rgba(187, 255, 0, 0.1);
+  border-color: rgba(187, 255, 0, 0.3);
+  transform: translateX(4px);
+}
+
+/* Active thread styling */
+.thread-dropdown-content .thread-item.active {
+  background: var(--accent-color);
+  color: #000;
+  font-weight: 700;
+  border-color: #fff;
+  box-shadow: 0 2px 8px rgba(187, 255, 0, 0.3);
+}
+
+/* Thread info section */
+.thread-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.thread-name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.thread-meta {
+  font-size: 11px;
+  opacity: 0.7;
+  color: #aaa;
+}
+
+.thread-dropdown-content .thread-item.active .thread-meta {
+  color: rgba(0, 0, 0, 0.7);
+}
+
+/* Delete button for threads */
+.thread-dropdown-content .thread-item .delete-btn {
+  background: #ff4444;
+  color: #fff;
+  border: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 10px;
+  opacity: 0;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thread-dropdown-content .thread-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.thread-dropdown-content .thread-item .delete-btn:hover {
+  background: #ff6666;
+  transform: scale(1.1);
+}
+
+/* Custom scrollbar for thread list */
+.thread-dropdown-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.thread-dropdown-content::-webkit-scrollbar-track {
+  background: #0a0a0a;
+  border-radius: 3px;
+}
+
+.thread-dropdown-content::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  border-radius: 3px;
+}
+
+.thread-dropdown-content::-webkit-scrollbar-thumb:hover {
+  background: #fff;
+}
+
+/* Empty state */
+.thread-dropdown-content .empty-threads {
+  padding: 20px 15px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* Loading state */
+.thread-dropdown-content .loading-threads {
+  padding: 15px;
+  text-align: center;
+  color: var(--accent-color);
+  font-size: 12px;
 }

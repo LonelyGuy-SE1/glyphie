@@ -796,7 +796,7 @@ async function init() {
 
 // UPDATED renderSnip - Force gallery refresh multiple ways
 function renderSnip() {
-  console.log("🔍 Debug: renderSnip() called");
+  console.log("🔧 Debug: renderSnip() called");
 
   // Check if there's a new snip flag
   const newSnipFlag = localStorage.getItem("glyphie-new-snip");
@@ -807,14 +807,14 @@ function renderSnip() {
 
   // Wait for DOM to be fully ready
   if (document.readyState !== "complete") {
-    console.log("🔍 DOM not ready, waiting...");
+    console.log("🔧 DOM not ready, waiting...");
     setTimeout(() => renderSnip(), 100);
     return;
   }
 
   // Debug - check if element exists
   const snipSection = document.getElementById("snip-section");
-  console.log("🔍 Debug: snipSection =", snipSection);
+  console.log("🔧 Debug: snipSection =", snipSection);
 
   if (!snipSection) {
     console.log("❌ Still can't find snip section");
@@ -1058,7 +1058,7 @@ function cropImage(dataUrl, coordinates) {
 
 // UPDATED setupSnipEventListeners - Load chat history
 function setupSnipEventListeners(snipContainer) {
-  console.log("🔍 Setting up snip event listeners");
+  console.log("🔧 Setting up snip event listeners");
 
   loadStoredSnips();
 
@@ -1067,19 +1067,115 @@ function setupSnipEventListeners(snipContainer) {
   const snipSendBtn = snipContainer.querySelector("#snip-send-btn");
   const snipChatHistory = snipContainer.querySelector("#snip-chat-history");
 
+  // ADD THESE NEW THREAD ELEMENTS
+  const newThreadBtn = snipContainer.querySelector("#snip-new-thread-btn");
+  const threadList = snipContainer.querySelector("#snip-thread-list");
+  const refreshBtn = snipContainer.querySelector("#refresh-threads-btn");
+  if (threadList) threadList.id = "active-snip-thread-list";
+  if (newThreadBtn) newThreadBtn.id = "active-snip-new-thread-btn";
+  if (refreshBtn) refreshBtn.id = "active-refresh-threads-btn";
+
   // Change IDs to avoid conflicts
   if (snipBtn) snipBtn.id = "active-snip-btn";
   if (snipInput) snipInput.id = "active-snip-input";
   if (snipSendBtn) snipSendBtn.id = "active-snip-send-btn";
   if (snipChatHistory) snipChatHistory.id = "active-snip-chat-history";
+  // Add this inside setupSnipEventListeners() after renaming IDs
 
-  // LOAD CHAT HISTORY FOR SNIPS
-  loadSnipChatHistory(snipChatHistory);
+  // DROPDOWN FUNCTIONALITY
+  const threadDropdownBtn =
+    snipContainer.querySelector("#snip-thread-dropdown-btn") ||
+    snipContainer.querySelector(".thread-dropdown-toggle");
+  const threadBar = snipContainer.querySelector("#snip-thread-bar");
+
+  if (threadDropdownBtn && threadBar) {
+    // Rename dropdown button if needed
+    if (threadDropdownBtn.id === "snip-thread-dropdown-btn") {
+      threadDropdownBtn.id = "active-snip-thread-dropdown-btn";
+    }
+
+    threadDropdownBtn.addEventListener("click", () => {
+      threadBar.classList.toggle("dropdown-open");
+
+      // Update arrow and text
+      const arrow = threadDropdownBtn.querySelector(".thread-dropdown-arrow");
+      const text = threadDropdownBtn.querySelector(".thread-dropdown-text");
+
+      if (threadBar.classList.contains("dropdown-open")) {
+        if (text) text.textContent = `Threads (${snipThreads.length})`;
+      } else {
+        if (text) text.textContent = "Threads";
+      }
+    });
+  }
+
+  // INITIALIZE THREADS - ADD THIS
+  initSnipThreads().then(() => {
+    updateSnipThreadList();
+
+    // Load current thread history
+    if (currentSnipThreadId && snipChatHistory) {
+      loadSnipThreadHistory(snipChatHistory, currentSnipThreadId);
+    }
+  });
+
+  // NEW THREAD BUTTON - ADD THIS
+  if (newThreadBtn) {
+    newThreadBtn.addEventListener("click", async () => {
+      const threadName = prompt(
+        "Enter thread name:",
+        `Thread ${snipThreads.length + 1}`
+      );
+      if (threadName && threadName.trim()) {
+        try {
+          newThreadBtn.textContent = "Creating...";
+          newThreadBtn.disabled = true;
+
+          const newThread = await createSnipThread(threadName.trim());
+          await switchSnipThread(newThread.id);
+
+          newThreadBtn.textContent = "+";
+          newThreadBtn.disabled = false;
+        } catch (error) {
+          alert("Failed to create thread: " + error.message);
+          newThreadBtn.textContent = "+";
+          newThreadBtn.disabled = false;
+        }
+      }
+    });
+  }
+
+  // LOAD CHAT HISTORY FOR CURRENT THREAD - MODIFY THIS
+  if (snipChatHistory && currentSnipThreadId) {
+    loadSnipThreadHistory(snipChatHistory, currentSnipThreadId);
+  } else if (snipChatHistory) {
+    snipChatHistory.innerHTML = `
+      <div style="text-align: center; padding: 20px; color: #666;">
+        <div style="font-size: 2em; margin-bottom: 10px;">💬</div>
+        <div>Create a thread to start chatting!</div>
+      </div>
+    `;
+  }
 
   // Create and insert snip gallery
   createSnipGallery(snipContainer);
 
   // Event listeners
+  // Add this to your setupSnipEventListeners function
+  const refreshThreadsBtn = snipContainer.querySelector("#refresh-threads-btn");
+  if (refreshThreadsBtn) {
+    refreshThreadsBtn.addEventListener("click", async () => {
+      refreshThreadsBtn.textContent = "Refreshing...";
+      refreshThreadsBtn.disabled = true;
+
+      await fetchThreadsFromAPI();
+      updateSnipThreadList();
+
+      refreshThreadsBtn.textContent = "🔄";
+      refreshThreadsBtn.disabled = false;
+    });
+  }
+
   if (snipBtn) {
     snipBtn.addEventListener("click", handleSnipAction);
   }
@@ -1092,6 +1188,24 @@ function setupSnipEventListeners(snipContainer) {
         snipSendBtn.disabled = true;
 
         console.log("📤 Starting send with:", selectedSnips.length, "images");
+
+        // ENSURE WE HAVE A CURRENT THREAD - ADD THIS CHECK
+        if (!currentSnipThreadId) {
+          try {
+            const newThread = await createSnipThread("New Thread");
+            currentSnipThreadId = newThread.id;
+            localStorage.setItem(
+              "glyphie-current-snip-thread",
+              currentSnipThreadId
+            );
+            updateSnipThreadList();
+          } catch (error) {
+            alert("Failed to create thread: " + error.message);
+            snipSendBtn.textContent = "Send";
+            snipSendBtn.disabled = false;
+            return;
+          }
+        }
 
         await handleSnipSend(snipChatHistory, message);
 
@@ -1106,6 +1220,8 @@ function setupSnipEventListeners(snipContainer) {
       }
     });
   }
+
+  // Event listeners
 
   if (snipInput) {
     snipInput.addEventListener("keydown", (e) => {
@@ -1184,7 +1300,6 @@ function createSnipGallery(container) {
   updateGallery(container);
 }
 
-// ENHANCED handleSnipSend - Use custom names in descriptions
 async function handleSnipSend(chatHistoryDiv, message) {
   console.log("📤 SENDING SNIPS:", selectedSnips.length, "selected");
 
@@ -1278,12 +1393,12 @@ async function handleSnipSend(chatHistoryDiv, message) {
     console.log("📤 Sending to API with message:", fullMessage);
     console.log("📤 Attachments:", uploadedImages);
 
-    // Send to Crestal API
+    // SEND TO CURRENT THREAD - MODIFY THIS
     const apiKey = characterApiKeys.white;
-    let chatId = localStorage.getItem(`intentkit_chatid_snip`);
+    const chatId = currentSnipThreadId; // Use current thread instead of creating new one
 
     if (!chatId) {
-      chatId = await createSnipChatThread();
+      throw new Error("No active thread found");
     }
 
     const response = await fetch(`${BASE_URL}/chats/${chatId}/messages`, {
@@ -1331,6 +1446,9 @@ async function handleSnipSend(chatHistoryDiv, message) {
         bubble.classList.remove("typing");
       }
 
+      // UPDATE THREAD MESSAGE COUNT - ADD THIS
+      updateThreadMessageCount(currentSnipThreadId);
+
       console.log("✅ API response completed");
     } else {
       throw new Error(`API request failed: ${response.status}`);
@@ -1345,27 +1463,6 @@ async function handleSnipSend(chatHistoryDiv, message) {
       true
     );
   }
-}
-
-// Create chat thread for snips
-async function createSnipChatThread() {
-  const apiKey = characterApiKeys.white;
-
-  const response = await fetch(`${BASE_URL}/chats`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({}),
-  });
-
-  if (!response.ok) throw new Error("Failed to create snip chat thread");
-
-  const data = await response.json();
-  const chatId = data.id;
-  localStorage.setItem(`intentkit_chatid_snip`, chatId);
-  return chatId;
 }
 
 // UPDATED appendSnipImageMessage - Show custom names
@@ -1837,6 +1934,275 @@ async function sendMessageToThread(chatId, personaKey, message) {
 
   return messageText;
 }
+async function regenerateLastResponseAlternative() {
+  if (!currentCharKey || !currentChatId) {
+    console.warn("No active chat to regenerate");
+    return;
+  }
+
+  // Check if there are any messages in history
+  if (chatHistory.length === 0) {
+    console.warn("No messages to regenerate");
+    return;
+  }
+
+  // Find the last user message to resend
+  let lastUserMessage = null;
+  for (let i = chatHistory.length - 1; i >= 0; i--) {
+    if (chatHistory[i].role === "user") {
+      lastUserMessage = chatHistory[i];
+      break;
+    }
+  }
+
+  if (!lastUserMessage) {
+    console.warn("No user message found to regenerate from");
+    return;
+  }
+
+  const chatHistoryDiv = document.getElementById("chat-history");
+  if (!chatHistoryDiv) {
+    console.warn("Chat history div not found");
+    return;
+  }
+
+  // Remove the last assistant message from the display
+  const messages = chatHistoryDiv.querySelectorAll(".message.bot");
+  if (messages.length > 0) {
+    const lastBotMessage = messages[messages.length - 1];
+    lastBotMessage.remove();
+  }
+
+  // Remove the last assistant message from chatHistory array
+  if (
+    chatHistory.length > 0 &&
+    chatHistory[chatHistory.length - 1].role === "assistant"
+  ) {
+    chatHistory.pop();
+  }
+
+  try {
+    // Set loading state
+    setLoadingState(true);
+    console.log("🔄 Regenerating with user message:", lastUserMessage.content);
+
+    // Resend the last user message
+    await sendMessageToThread(
+      currentChatId,
+      currentCharKey,
+      lastUserMessage.content
+    );
+
+    // Scroll to bottom
+    chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+
+    console.log("✅ Response regenerated successfully using resend method");
+  } catch (error) {
+    console.error("❌ Regenerate error:", error);
+
+    // Show error message
+    appendMessage(
+      chatHistoryDiv,
+      "bot",
+      `Sorry, I couldn't regenerate the response: ${error.message}`,
+      new Date().toISOString(),
+      true
+    );
+  } finally {
+    setLoadingState(false);
+  }
+}
+
+// Main regenerate function that tries retry first, then falls back to alternative
+async function regenerateLastResponse() {
+  if (!currentCharKey || !currentChatId) {
+    console.warn("No active chat to regenerate");
+    return;
+  }
+
+  // Check if there are any messages in history
+  if (chatHistory.length === 0) {
+    console.warn("No messages to regenerate");
+    return;
+  }
+
+  // Find the last assistant message to remove it from display
+  const chatHistoryDiv = document.getElementById("chat-history");
+  if (!chatHistoryDiv) {
+    console.warn("Chat history div not found");
+    return;
+  }
+
+  // Remove the last assistant message from the display
+  const messages = chatHistoryDiv.querySelectorAll(".message.bot");
+  if (messages.length > 0) {
+    const lastBotMessage = messages[messages.length - 1];
+    lastBotMessage.remove();
+  }
+
+  // Remove the last assistant message from chatHistory array
+  if (
+    chatHistory.length > 0 &&
+    chatHistory[chatHistory.length - 1].role === "assistant"
+  ) {
+    chatHistory.pop();
+  }
+
+  try {
+    // Set loading state
+    setLoadingState(true);
+
+    // Try the retry endpoint first
+    const personaApiKey = characterApiKeys[currentCharKey];
+    if (!personaApiKey) throw new Error("API key for persona not found");
+
+    console.log("🔄 Calling retry endpoint for chat:", currentChatId);
+
+    const response = await fetch(
+      `${BASE_URL}/chats/${currentChatId}/messages/retry`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${personaApiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.warn("❌ Retry endpoint failed, falling back to resend method");
+      setLoadingState(false);
+      await regenerateLastResponseAlternative();
+      return;
+    }
+
+    // Check if response is JSON (non-streaming) or streaming
+    const contentType = response.headers.get("content-type");
+    console.log("📥 Response content-type:", contentType);
+
+    if (contentType && contentType.includes("application/json")) {
+      // Handle JSON response (non-streaming)
+      const data = await response.json();
+      console.log("📥 JSON response:", data);
+
+      let messageText = "";
+
+      // The retry endpoint returns an array of messages
+      if (Array.isArray(data) && data.length > 0) {
+        // Find the agent's response
+        const agentMessage = data.find(
+          (msg) =>
+            msg.author_type === "agent" ||
+            msg.author_type === "system" ||
+            !msg.author_type // fallback
+        );
+
+        if (agentMessage && agentMessage.message) {
+          messageText = agentMessage.message;
+        } else {
+          messageText =
+            data[data.length - 1].message || "No response generated";
+        }
+      } else {
+        messageText = "No response generated";
+      }
+
+      console.log("📥 Extracted message:", messageText);
+
+      if (!messageText.trim()) {
+        console.warn(
+          "❌ Empty message from retry, falling back to resend method"
+        );
+        setLoadingState(false);
+        await regenerateLastResponseAlternative();
+        return;
+      }
+
+      // Display the message
+      const timestamp = new Date().toISOString();
+      appendMessage(chatHistoryDiv, "bot", messageText, timestamp);
+
+      // Add to chat history
+      chatHistory.push({
+        role: "assistant",
+        content: messageText,
+        created_at: timestamp,
+      });
+    } else {
+      // Handle streaming response
+      console.log("📥 Handling streaming response");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let messageText = "";
+
+      let bubble = appendStreamingMessage(chatHistoryDiv, "bot", "", null);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunkStr = decoder.decode(value);
+        console.log("📥 Received chunk:", chunkStr);
+
+        try {
+          for (const line of chunkStr.trim().split("\n")) {
+            if (!line.trim()) continue;
+            const obj = JSON.parse(line);
+            if (obj.message !== undefined) {
+              messageText += obj.message;
+              if (bubble) {
+                bubble.querySelector(".msg-content").textContent = messageText;
+              }
+            }
+          }
+        } catch (parseError) {
+          console.log("📥 Non-JSON chunk, treating as text:", chunkStr);
+          messageText += chunkStr;
+          if (bubble) {
+            bubble.querySelector(".msg-content").textContent = messageText;
+          }
+        }
+      }
+
+      if (!messageText.trim()) {
+        console.warn(
+          "❌ Empty message from streaming retry, falling back to resend method"
+        );
+        if (bubble) bubble.remove();
+        setLoadingState(false);
+        await regenerateLastResponseAlternative();
+        return;
+      }
+
+      // Finalize the message
+      const timestamp = new Date().toISOString();
+      if (bubble) {
+        setMessageTimestamp(bubble, timestamp);
+        bubble.classList.remove("typing");
+      }
+
+      // Add to chat history
+      chatHistory.push({
+        role: "assistant",
+        content: messageText,
+        created_at: timestamp,
+      });
+    }
+
+    // Scroll to bottom
+    chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+
+    console.log("✅ Response regenerated successfully");
+  } catch (error) {
+    console.error("❌ Regenerate error:", error);
+    setLoadingState(false);
+
+    console.warn("❌ Retry method failed, falling back to resend method");
+    await regenerateLastResponseAlternative();
+  } finally {
+    setLoadingState(false);
+  }
+}
 
 function appendStreamingMessage(container, sender, text, timestamp) {
   const msg = document.createElement("div");
@@ -1960,6 +2326,13 @@ async function startChatWithPersonality(key) {
   regenerateBtn.textContent = "Regenerate";
 
   // Style for toolbar buttons
+  regenerateBtn.addEventListener("mouseover", () => {
+    regenerateBtn.style.background = "var(--button-hover-bg)";
+  });
+
+  regenerateBtn.addEventListener("mouseout", () => {
+    regenerateBtn.style.background = "var(--button-bg)";
+  });
   [attachBtnToolbar, regenerateBtn].forEach((btn) => {
     btn.style.cursor = "pointer";
     btn.style.borderRadius = "8px";
@@ -2026,6 +2399,32 @@ async function startChatWithPersonality(key) {
       console.error(error);
     }
     setLoadingState(false, sendBtn);
+  });
+  regenerateBtn.addEventListener("click", async () => {
+    if (!currentCharKey || !currentChatId) {
+      alert("No active chat to regenerate");
+      return;
+    }
+
+    if (chatHistory.length === 0) {
+      alert("No messages to regenerate");
+      return;
+    }
+
+    // Confirm regeneration
+    if (confirm("Regenerate the last response?")) {
+      regenerateBtn.textContent = "Regenerating...";
+      regenerateBtn.disabled = true;
+
+      try {
+        await regenerateLastResponse();
+      } catch (error) {
+        console.error("Regenerate button error:", error);
+      } finally {
+        regenerateBtn.textContent = "Regenerate";
+        regenerateBtn.disabled = false;
+      }
+    }
   });
 
   input.addEventListener("keydown", (e) => {
@@ -2360,6 +2759,427 @@ function highlightNewSnip(snipId) {
     }, 4000);
   } else {
     console.log("❌ HIGHLIGHT: Could not find target item in DOM");
+  }
+}
+// === SNIP THREAD MANAGEMENT ===
+
+// Global variables for snip threads
+let snipThreads = [];
+let currentSnipThreadId = null;
+
+// Load snip threads from localStorage
+function loadSnipThreads() {
+  try {
+    const saved = localStorage.getItem("glyphie-snip-threads");
+    snipThreads = saved ? JSON.parse(saved) : [];
+    console.log("📋 Loaded", snipThreads.length, "snip threads from storage");
+  } catch (error) {
+    console.error("❌ Error loading snip threads:", error);
+    snipThreads = [];
+  }
+}
+
+// Save snip threads to localStorage
+function saveSnipThreads() {
+  try {
+    localStorage.setItem("glyphie-snip-threads", JSON.stringify(snipThreads));
+    console.log("💾 Saved", snipThreads.length, "snip threads to storage");
+  } catch (error) {
+    console.error("❌ Error saving snip threads:", error);
+  }
+}
+
+// Create a new snip thread
+async function createSnipThread(name = null) {
+  console.log("🆕 Creating new snip thread...");
+
+  try {
+    // Create thread via API
+    const apiKey = characterApiKeys.white;
+    const response = await fetch(`${BASE_URL}/chats`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create thread: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const chatId = data.id;
+
+    // Generate thread name if not provided
+    const threadName = name || `Thread ${snipThreads.length + 1}`;
+    const timestamp = new Date().toISOString();
+
+    // Create local thread object
+    const newThread = {
+      id: chatId,
+      name: threadName,
+      created_at: timestamp,
+      updated_at: timestamp,
+      messageCount: 0,
+    };
+
+    // Add to threads list
+    snipThreads.push(newThread);
+    saveSnipThreads();
+
+    console.log("✅ Created new snip thread:", threadName, "ID:", chatId);
+    return newThread;
+  } catch (error) {
+    console.error("❌ Failed to create snip thread:", error);
+    throw error;
+  }
+}
+
+// Switch to a different snip thread
+async function switchSnipThread(threadId) {
+  console.log("🔄 Switching to snip thread:", threadId);
+
+  const thread = snipThreads.find((t) => t.id === threadId);
+  if (!thread) {
+    console.error("❌ Thread not found:", threadId);
+    return;
+  }
+
+  currentSnipThreadId = threadId;
+  localStorage.setItem("glyphie-current-snip-thread", threadId);
+
+  // Update chat history display
+  const chatHistoryDiv = document.getElementById("active-snip-chat-history");
+  if (chatHistoryDiv) {
+    await loadSnipThreadHistory(chatHistoryDiv, threadId);
+  }
+
+  // Update thread list display
+  updateSnipThreadList();
+
+  console.log("✅ Switched to thread:", thread.name);
+}
+
+// Load chat history for a specific snip thread
+async function loadSnipThreadHistory(chatHistoryDiv, threadId) {
+  console.log("📜 Loading history for snip thread:", threadId);
+
+  if (!chatHistoryDiv) {
+    console.warn("No chat history div found");
+    return;
+  }
+
+  try {
+    const apiKey = characterApiKeys.white;
+    const response = await fetch(
+      `${BASE_URL}/chats/${threadId}/messages?limit=50`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch thread history: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const history = data.data || [];
+
+    if (history.length === 0) {
+      chatHistoryDiv.innerHTML = `
+        <div style="text-align: center; padding: 20px; color: #666;">
+          <div style="font-size: 2em; margin-bottom: 10px;">💬</div>
+          <div>No messages yet. Send a snip to start!</div>
+        </div>
+      `;
+      return;
+    }
+
+    // Clear and display history (oldest first)
+    chatHistoryDiv.innerHTML = "";
+
+    history.reverse().forEach((msg) => {
+      const authorType = msg.author_type?.toLowerCase();
+      const author =
+        authorType === "api" || authorType === "user" ? "user" : "bot";
+      appendSnipMessage(chatHistoryDiv, author, msg.message, msg.created_at);
+    });
+
+    // Scroll to bottom
+    setTimeout(() => {
+      chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+    }, 100);
+
+    console.log("📜 Loaded", history.length, "messages for thread");
+  } catch (error) {
+    console.error("❌ Failed to load thread history:", error);
+    chatHistoryDiv.innerHTML = `
+      <div style="text-align: center; padding: 20px; color: #666;">
+        <div style="font-size: 2em; margin-bottom: 10px;">⚠️</div>
+        <div>Could not load chat history</div>
+      </div>
+    `;
+  }
+}
+
+function updateSnipThreadList() {
+  const threadList =
+    document.getElementById("active-snip-thread-list") ||
+    document.getElementById("snip-thread-list");
+
+  const threadBar =
+    document.getElementById("active-snip-thread-bar") ||
+    document.getElementById("snip-thread-bar");
+
+  if (!threadList) {
+    console.warn("Thread list element not found");
+    return;
+  }
+
+  threadList.innerHTML = "";
+
+  // Update dropdown button text with count
+  const dropdownText = threadBar?.querySelector(".thread-dropdown-text");
+  if (dropdownText) {
+    dropdownText.textContent = `Threads (${snipThreads.length})`;
+  }
+
+  if (snipThreads.length === 0) {
+    const emptyItem = document.createElement("li");
+    emptyItem.className = "empty-threads";
+    emptyItem.textContent = "No threads yet. Create one to get started!";
+    threadList.appendChild(emptyItem);
+    return;
+  }
+
+  snipThreads.forEach((thread) => {
+    const item = document.createElement("li");
+    item.className = "thread-item";
+
+    if (thread.id === currentSnipThreadId) {
+      item.classList.add("active");
+    }
+
+    const threadInfo = document.createElement("div");
+    threadInfo.className = "thread-info";
+
+    const threadName = document.createElement("div");
+    threadName.className = "thread-name";
+    threadName.textContent = thread.name;
+
+    const threadMeta = document.createElement("div");
+    threadMeta.className = "thread-meta";
+    const date = new Date(thread.created_at).toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+    });
+    threadMeta.textContent = `${date} • ${thread.messageCount || 0} msgs`;
+
+    threadInfo.appendChild(threadName);
+    threadInfo.appendChild(threadMeta);
+
+    // Delete button
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.textContent = "×";
+    deleteBtn.title = "Delete thread";
+
+    // Event listeners
+    deleteBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (confirm(`Delete thread "${thread.name}"?`)) {
+        try {
+          await deleteSnipThread(thread.id);
+        } catch (error) {
+          console.error("Delete error:", error);
+          alert("Failed to delete thread");
+        }
+      }
+    });
+
+    item.addEventListener("click", async (e) => {
+      if (e.target === deleteBtn) return;
+      try {
+        await switchSnipThread(thread.id);
+
+        // Close dropdown after selection
+        if (threadBar) {
+          threadBar.classList.remove("dropdown-open");
+        }
+      } catch (error) {
+        console.error("Switch thread error:", error);
+      }
+    });
+
+    item.appendChild(threadInfo);
+    item.appendChild(deleteBtn);
+    threadList.appendChild(item);
+  });
+
+  console.log("✅ Thread dropdown updated with", snipThreads.length, "threads");
+}
+
+// Delete a snip thread
+async function deleteSnipThread(threadId) {
+  const thread = snipThreads.find((t) => t.id === threadId);
+  if (!thread) return;
+
+  if (!confirm(`Delete thread "${thread.name}"? This cannot be undone.`)) {
+    return;
+  }
+
+  console.log("🗑️ Deleting snip thread:", threadId);
+
+  try {
+    // Delete from API (optional - threads might auto-delete when empty)
+    const apiKey = characterApiKeys.white;
+    await fetch(`${BASE_URL}/chats/${threadId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
+
+    // Remove from local storage
+    snipThreads = snipThreads.filter((t) => t.id !== threadId);
+    saveSnipThreads();
+
+    // If this was the current thread, switch to another or create new
+    if (currentSnipThreadId === threadId) {
+      if (snipThreads.length > 0) {
+        await switchSnipThread(snipThreads[0].id);
+      } else {
+        currentSnipThreadId = null;
+        localStorage.removeItem("glyphie-current-snip-thread");
+
+        // Clear chat history
+        const chatHistoryDiv = document.getElementById(
+          "active-snip-chat-history"
+        );
+        if (chatHistoryDiv) {
+          chatHistoryDiv.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #666;">
+              <div style="font-size: 2em; margin-bottom: 10px;">💬</div>
+              <div>Create a new thread to start chatting!</div>
+            </div>
+          `;
+        }
+      }
+    }
+
+    // Update UI
+    updateSnipThreadList();
+    console.log("✅ Thread deleted successfully");
+  } catch (error) {
+    console.error("❌ Failed to delete thread:", error);
+    alert("Failed to delete thread. Please try again.");
+  }
+}
+
+async function initSnipThreads() {
+  console.log("🚀 Initializing snip threads...");
+
+  loadSnipThreads();
+
+  // Fetch existing threads from API
+  await fetchThreadsFromAPI();
+  console.log("📋 Total threads after API fetch:", snipThreads.length);
+  console.log(
+    "📋 Threads:",
+    snipThreads.map((t) => `${t.name} (${t.id.slice(-8)})`)
+  );
+
+  // Get current thread from localStorage
+  const savedCurrentThread = localStorage.getItem(
+    "glyphie-current-snip-thread"
+  );
+
+  if (
+    savedCurrentThread &&
+    snipThreads.find((t) => t.id === savedCurrentThread)
+  ) {
+    currentSnipThreadId = savedCurrentThread;
+  } else if (snipThreads.length > 0) {
+    // Use the most recent thread
+    currentSnipThreadId = snipThreads[0].id; // Already sorted newest first
+    localStorage.setItem("glyphie-current-snip-thread", currentSnipThreadId);
+  } else {
+    // Create initial thread if none exist
+    try {
+      const newThread = await createSnipThread("Main Thread");
+      currentSnipThreadId = newThread.id;
+      localStorage.setItem("glyphie-current-snip-thread", currentSnipThreadId);
+    } catch (error) {
+      console.error("❌ Failed to create initial thread:", error);
+    }
+  }
+
+  console.log(
+    "🚀 Snip threads initialized. Current thread:",
+    currentSnipThreadId
+  );
+}
+
+// Update message count for a thread
+function updateThreadMessageCount(threadId) {
+  const thread = snipThreads.find((t) => t.id === threadId);
+  if (thread) {
+    thread.messageCount = (thread.messageCount || 0) + 1;
+    thread.updated_at = new Date().toISOString();
+    saveSnipThreads();
+    updateSnipThreadList();
+  }
+}
+async function fetchThreadsFromAPI() {
+  console.log("🔍 Fetching existing threads from API...");
+
+  try {
+    const apiKey = characterApiKeys.white;
+    const response = await fetch(`${BASE_URL}/chats`, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch threads: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const apiThreads = data.data || [];
+
+    console.log(`📋 Found ${apiThreads.length} threads from API`);
+
+    // Convert API threads to our format and merge with local threads
+    const existingIds = new Set(snipThreads.map((t) => t.id));
+
+    apiThreads.forEach((apiThread) => {
+      if (!existingIds.has(apiThread.id)) {
+        const thread = {
+          id: apiThread.id,
+          name: `Thread ${apiThread.id.slice(-8)}`, // Use last 8 chars of ID as name
+          created_at: apiThread.created_at || new Date().toISOString(),
+          updated_at: apiThread.updated_at || new Date().toISOString(),
+          messageCount: 0, // Will be updated when messages are loaded
+        };
+        snipThreads.push(thread);
+      }
+    });
+
+    // Sort threads by creation date (newest first)
+    snipThreads.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    saveSnipThreads();
+    console.log(`✅ Merged threads. Total: ${snipThreads.length}`);
+  } catch (error) {
+    console.error("❌ Failed to fetch threads from API:", error);
+    // Continue with local threads only
   }
 }
 

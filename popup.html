@@ -13,6 +13,7 @@
 
   <body>
     <div id="container">
+      <!-- ───── MINIMIZED PANEL ───── -->
       <div class="minimized-panel">
         <div class="minimized-status" id="minimized-status">Glyphie</div>
         <button class="minimized-expand-btn" id="minimized-expand-btn">
@@ -21,9 +22,10 @@
       </div>
 
       <div id="wrapper">
-        <!-- Sidebar Navigation as a tablist -->
+        <!-- ───── SIDEBAR ───── -->
         <nav id="sidebar" role="tablist" aria-label="Main navigation">
           <div class="logo" aria-label="Glyphie logo">Glyphie</div>
+
           <button class="nav-btn" data-section="home">🏠 Home</button>
 
           <button
@@ -74,14 +76,15 @@
             <span class="label">Usage</span>
           </button>
         </nav>
-        <!-- Characters Section -->
+
+        <!-- ───── CHARACTERS SECTION (populated by JS) ───── -->
         <section
           id="characters-section"
           class="content-section"
           aria-label="Characters"
         ></section>
 
-        <!-- Snip Section -->
+        <!-- ───── SNIP SECTION ───── -->
         <section
           id="snip-section"
           class="content-section hidden"
@@ -91,27 +94,49 @@
             <div class="chat-header" aria-label="Snip mode header">
               <span>Snip Mode ✂️</span>
             </div>
-            <!-- THREADS BAR - Snip Chat -->
-            <div
-              id="snip-thread-bar"
-              class="thread-section"
-              aria-label="Snip Threads"
-            >
-              <div class="thread-header">
-                <span>Threads</span>
+
+            <!-- THREAD BAR (used by popup.js) -->
+            <!-- UPDATED THREAD BAR - Dropdown Style -->
+            <div id="snip-thread-bar" class="thread-section">
+              <div class="thread-header-dropdown">
                 <button
-                  id="snip-new-thread-btn"
-                  type="button"
-                  aria-label="Add new snip thread"
-                  title="New Thread"
+                  id="snip-thread-dropdown-btn"
+                  class="thread-dropdown-toggle"
                 >
-                  +
+                  <span class="thread-dropdown-icon">💬</span>
+                  <span class="thread-dropdown-text">Threads</span>
+                  <span class="thread-dropdown-arrow">▼</span>
                 </button>
+
+                <div class="thread-controls">
+                  <button
+                    id="refresh-threads-btn"
+                    title="Refresh threads"
+                    type="button"
+                  >
+                    🔄
+                  </button>
+                  <button
+                    id="snip-new-thread-btn"
+                    type="button"
+                    title="New Thread"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-              <ul id="snip-thread-list" class="thread-list"></ul>
+
+              <!-- This will be hidden by default -->
+              <ul
+                id="snip-thread-list"
+                class="thread-list thread-dropdown-content"
+              ></ul>
             </div>
 
+            <!-- SNIP CHAT HISTORY -->
             <div id="snip-chat-history" class="chat-history"></div>
+
+            <!-- SNIP CHAT INPUT -->
             <div class="chat-input-row">
               <button id="snip-btn" title="Start a new snip" type="button">
                 Snip ✂️
@@ -119,7 +144,7 @@
               <input
                 id="snip-chat-input"
                 type="text"
-                placeholder="Add a message (optional)..."
+                placeholder="Add a message (optional)…"
                 autocomplete="off"
                 aria-label="Add a message (optional)"
               />
@@ -128,14 +153,14 @@
           </div>
         </section>
 
-        <!-- Stats Section -->
+        <!-- ───── STATS SECTION (placeholder) ───── -->
         <section
           id="stats-section"
           class="content-section hidden"
           aria-label="Usage Stats"
         ></section>
 
-        <!-- Settings Section -->
+        <!-- ───── SETTINGS SECTION (placeholder) ───── -->
         <section
           id="settings-section"
           class="content-section hidden"
@@ -154,7 +179,7 @@
           </div>
         </section>
 
-        <!-- Main Content Area -->
+        <!-- ───── MAIN CHAT PANEL ───── -->
         <main
           id="main-content"
           role="main"
@@ -162,10 +187,7 @@
           aria-relevant="additions removals"
           tabindex="0"
         >
-          <!-- Active Chat Panel -->
           <div class="chat-panel" aria-label="Active chat panel">
-            <!-- THREADS BAR - Main Chat -->
-
             <div class="chat-header" aria-label="Chat header" role="banner">
               <img
                 class="chat-avatar"
@@ -177,6 +199,8 @@
                 >Select an agent</span
               >
             </div>
+
+            <!-- MAIN CHAT HISTORY -->
             <div
               id="chat-history"
               class="chat-history"
@@ -185,7 +209,7 @@
               tabindex="0"
             ></div>
 
-            <!-- Toolbar with Attach & Regenerate buttons -->
+            <!-- TOOLBAR -->
             <div class="chat-toolbar" role="region" aria-label="Chat toolbar">
               <button
                 id="toolbar-attach-btn"
@@ -203,6 +227,8 @@
               >
                 ⟳
               </button>
+
+              <!-- AGENT THREAD BAR (used by popup.js) -->
               <div
                 id="agent-thread-section"
                 class="thread-section"
@@ -210,7 +236,11 @@
               >
                 <div class="thread-header">
                   <span>Threads</span>
-                  <button id="new-thread-btn" title="Create new thread">
+                  <button
+                    id="new-thread-btn"
+                    title="Create new thread"
+                    type="button"
+                  >
                     +
                   </button>
                 </div>
@@ -223,20 +253,18 @@
                     padding: 0;
                     margin: 0;
                   "
-                >
-                  <!-- Thread items will be dynamically added here -->
-                </ul>
+                ></ul>
               </div>
             </div>
 
-            <!-- Attachment Preview Bar -->
+            <!-- ATTACHMENT PREVIEW BAR -->
             <div
               id="attachment-preview"
               aria-live="polite"
               aria-atomic="true"
             ></div>
 
-            <!-- Chat Input Row -->
+            <!-- CHAT INPUT -->
             <div class="chat-input-row">
               <div class="chat-input-group">
                 <textarea
@@ -259,7 +287,7 @@
             </div>
           </div>
 
-          <!-- Attachment Preview Modal -->
+          <!-- ATTACHMENT MODAL -->
           <div
             id="attachment-modal"
             class="attachment-modal"
@@ -282,6 +310,7 @@
         </main>
       </div>
 
+      <!-- OVERLAY + SIDEBAR TOGGLE -->
       <div id="main-content-overlay" tabindex="-1"></div>
       <button
         id="sidebar-toggle"
@@ -292,6 +321,7 @@
         ☰
       </button>
     </div>
+
     <script src="popup.js"></script>
   </body>
 </html>
