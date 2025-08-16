@@ -55,10 +55,8 @@ function cropImage(dataUrl, coordinates) {
         // Apply pixel ratio correction - the key fix here
         const sourceX = Math.round(coordinates.x * devicePixelRatio);
         const sourceY = Math.round(coordinates.y * devicePixelRatio);
-        const sourceWidth =
-          Math.round(coordinates.width * devicePixelRatio) + 75;
-        const sourceHeight =
-          Math.round(coordinates.height * devicePixelRatio) + 75;
+        const sourceWidth = Math.round(coordinates.width * devicePixelRatio);
+        const sourceHeight = Math.round(coordinates.height * devicePixelRatio);
 
         console.log("✂️ OFFSCREEN: Source crop area:", {
           x: sourceX,

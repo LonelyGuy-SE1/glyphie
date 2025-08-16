@@ -1795,7 +1795,7 @@ function renderHome() {
 
   const quickActions = [
     { label: "🗂️ Explore Agents", section: "characters" },
-    { label: "✂️ New Snip", section: "snip" },
+    { label: "✂️ Snip", section: "snip" },
     { label: "📊 Stats", section: "stats" },
     { label: "⚙️ Settings", section: "settings" },
   ];
