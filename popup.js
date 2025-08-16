@@ -916,10 +916,10 @@ async function updateGallery(container) {
       snip.name ||
       `Screenshot ${snip.dimensions.width}×${snip.dimensions.height}`;
 
-    item.innerHTML = `
-      <img src="${snip.data}" 
-           style="width: 100px; height: 60px; object-fit: cover; border-radius: 4px; display: block;"
-           alt="Snip ${index + 1}">
+    item.innerHTML = `<img src="${snip.data}" 
+       style="width: 100px; height: 60px; object-fit: cover; border-radius: 4px; display: block; cursor: pointer;"
+       alt="Snip ${index + 1}"
+       onclick="showImageModal('${snip.data}')">
       
       <div class="snip-name" style="text-align: center; font-size: 10px; color: #ccc; margin-top: 4px; 
                                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;">
@@ -945,6 +945,14 @@ async function updateGallery(container) {
               onmouseout="this.style.background='#4444ff'; this.style.transform='scale(1)'"
               title="Rename snip">✏️</button>
     `;
+    // Add click handler for image preview
+    const img = item.querySelector("img");
+    if (img) {
+      img.addEventListener("click", (e) => {
+        e.stopPropagation(); // Prevent item selection when clicking image
+        showImageModal(snip.data);
+      });
+    }
 
     // Delete button functionality
     const deleteBtn = item.querySelector(".snip-delete-btn");

@@ -49,8 +49,23 @@ async function handleCapture(coordinates, tabId) {
   console.log("📸 BACKGROUND CAPTURE: Starting");
 
   try {
-    // Step 1: Capture full screenshot
-    console.log("📸 BACKGROUND: Capturing visible tab");
+    // Step 1: Hide overlay before capture
+    console.log("🔸 BACKGROUND: Hiding overlay before capture");
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: () => {
+        const overlay = document.getElementById("glyphie-snip-overlay-v2");
+        if (overlay) {
+          overlay.style.display = "none";
+        }
+      },
+    });
+
+    // Wait a bit for overlay to hide
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Step 2: Capture full screenshot
+    console.log("🔸 BACKGROUND: Capturing visible tab");
     const dataUrl = await chrome.tabs.captureVisibleTab(null, {
       format: "png",
       quality: 100,
@@ -120,36 +135,54 @@ async function handleCapture(coordinates, tabId) {
   }
 }
 
-// Send to popup for cropping (since service worker can't use Canvas/Image)
 async function sendToCropInPopup(dataUrl, coordinates) {
-  return new Promise((resolve, reject) => {
-    // Try to send to any open popup
-    chrome.runtime.sendMessage(
-      {
-        type: "CROP_IMAGE",
-        dataUrl: dataUrl,
-        coordinates: coordinates,
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          console.error(
-            "❌ BACKGROUND: No popup available for cropping:",
-            chrome.runtime.lastError
-          );
-          // Fallback: return uncropped image
-          resolve(dataUrl);
-        } else if (response && response.success) {
-          resolve(response.croppedImage);
-        } else {
-          reject(new Error("Cropping failed"));
+  try {
+    // First try popup method
+    const popupResult = await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "CROP_IMAGE",
+          dataUrl: dataUrl,
+          coordinates: coordinates,
+        },
+        (response) => {
+          if (chrome.runtime.lastError || !response?.success) {
+            resolve(null);
+          } else {
+            resolve(response.croppedImage);
+          }
         }
-      }
-    );
+      );
+      // Quick timeout for popup method
+      setTimeout(() => resolve(null), 1000);
+    });
 
-    // Timeout fallback
-    setTimeout(() => {
-      console.warn("⚠️ BACKGROUND: Cropping timeout, using full image");
-      resolve(dataUrl);
-    }, 3000);
-  });
+    if (popupResult) {
+      console.log("✅ BACKGROUND: Popup cropping succeeded");
+      return popupResult;
+    }
+
+    // Fallback: Create offscreen document for cropping
+    console.log("🔄 BACKGROUND: Using offscreen document for cropping");
+
+    await chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: ["DOM_SCRAPING"],
+      justification: "Image cropping requires canvas manipulation",
+    });
+
+    const croppedResult = await chrome.runtime.sendMessage({
+      type: "CROP_IN_OFFSCREEN",
+      dataUrl: dataUrl,
+      coordinates: coordinates,
+    });
+
+    await chrome.offscreen.closeDocument();
+
+    return croppedResult.croppedImage;
+  } catch (error) {
+    console.error("⚠️ BACKGROUND: All cropping methods failed:", error);
+    // Last resort: return original image
+    return dataUrl;
+  }
 }
