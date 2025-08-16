@@ -57,29 +57,10 @@ async function handleCapture(coordinates, tabId) {
   console.log("📸 BACKGROUND CAPTURE: Starting with coordinates:", coordinates);
 
   try {
-    // Step 1: Hide overlay with multiple attempts and verification
+    // Step 1: Hide overlay with enhanced method
     console.log("📸 BACKGROUND: Hiding overlay before capture");
-    await chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      func: () => {
-        return new Promise((resolve) => {
-          // Find and hide the overlay
-          const overlay = document.getElementById("glyphie-snip-overlay-v2");
-          if (overlay) {
-            overlay.style.display = "none";
-            overlay.style.visibility = "hidden";
-            overlay.style.opacity = "0";
-            overlay.style.zIndex = "-1";
-            console.log("🙈 CONTENT: Overlay hidden");
-          }
-
-          // Wait a bit longer to ensure overlay is fully hidden
-          setTimeout(() => {
-            resolve(true);
-          }, 200);
-        });
-      },
-    });
+    await hideOverlayRobustly(tabId);
+    await new Promise((resolve) => setTimeout(resolve, 500)); // Extra wait
 
     console.log("📸 BACKGROUND: Overlay should be hidden, waiting...");
     // Additional wait to ensure overlay is completely hidden
@@ -167,6 +148,46 @@ async function handleCapture(coordinates, tabId) {
 
     throw error;
   }
+}
+// ENHANCED overlay hiding with multiple verification attempts
+async function hideOverlayRobustly(tabId) {
+  console.log("🙈 BACKGROUND: Starting robust overlay hiding");
+
+  // Method 1: Remove overlay completely
+  await chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    func: () => {
+      const overlay = document.getElementById("glyphie-snip-overlay-v2");
+      if (overlay) {
+        overlay.remove();
+        console.log("🙈 CONTENT: Overlay completely removed");
+      }
+      // Also remove any other snip overlays
+      const allOverlays = document.querySelectorAll(
+        '[id*="glyphie-snip"], [class*="snip-overlay"]'
+      );
+      allOverlays.forEach((el) => el.remove());
+    },
+  });
+
+  // Method 2: Wait and inject CSS to hide any remaining elements
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  await chrome.scripting.insertCSS({
+    target: { tabId: tabId },
+    css: `
+      #glyphie-snip-overlay-v2,
+      [id*="glyphie-snip"],
+      [class*="snip-overlay"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        z-index: -9999 !important;
+      }
+    `,
+  });
+
+  console.log("✅ BACKGROUND: Overlay hiding completed");
 }
 
 async function cropImageInBackground(dataUrl, coordinates) {

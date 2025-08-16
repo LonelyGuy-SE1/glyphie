@@ -235,6 +235,31 @@ async function handleSnipAction() {
       },
     });
 
+    // Add this after the chrome.scripting.executeScript call in handleSnipAction
+    // (around line 150 in your popup.js)
+
+    // Inject CSS to ensure overlay is hidden during capture
+    chrome.scripting
+      .insertCSS({
+        target: { tabId: tab.id },
+        css: `
+    #glyphie-snip-overlay-v2,
+    [id*="glyphie-snip"],
+    [class*="snip-overlay"] {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      z-index: -9999 !important;
+    }
+  `,
+      })
+      .then(() => {
+        console.log("✅ POPUP: CSS injection completed");
+      })
+      .catch((error) => {
+        console.warn("⚠️ POPUP: CSS injection failed:", error);
+      });
+
     console.log("✅ POPUP: Enhanced content script injected");
 
     // Update UI
