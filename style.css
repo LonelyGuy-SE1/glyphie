@@ -1686,3 +1686,163 @@ body.light .theme-label {
   font-size: 1.4em;
   font-weight: bold;
 }
+
+/* Dropdown content (thread list) */
+.thread-dropdown-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #161616;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Show dropdown when open */
+#snip-thread-bar.dropdown-open .thread-dropdown-content,
+#active-snip-thread-bar.dropdown-open .thread-dropdown-content {
+  max-height: 200px; /* Fixed height for scrolling area */
+  padding: 10px 0;
+  overflow-y: auto; /* Enable vertical scrollbar */
+  scrollbar-width: thin; /* For Firefox */
+}
+
+/* ENHANCED: Custom scrollbar styles for webkit browsers */
+.thread-dropdown-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.thread-dropdown-content::-webkit-scrollbar-track {
+  background: #0a0a0a;
+  border-radius: 3px;
+}
+
+.thread-dropdown-content::-webkit-scrollbar-thumb {
+  background-color: var(--accent-color); /* Uses your theme color */
+  border-radius: 4px;
+  border: 1px solid #0a0a0a;
+}
+
+.thread-dropdown-content::-webkit-scrollbar-thumb:hover {
+  background-color: #fff; /* Matches your existing hover style */
+}
+
+/* Corner styling when both scrollbars are present */
+.thread-dropdown-content::-webkit-scrollbar-corner {
+  background: #0a0a0a;
+}
+/* === CUSTOM MODAL STYLES === */
+.glyphie-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.glyphie-modal {
+  background: var(--background-color);
+  border: 3px solid var(--accent-color);
+  border-radius: 15px;
+  padding: 25px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 10px 30px rgba(187, 255, 0, 0.3);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.glyphie-modal-header {
+  font-size: 1.3em;
+  font-weight: bold;
+  color: var(--accent-color);
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.glyphie-modal-body {
+  color: var(--text-color);
+  margin-bottom: 20px;
+  font-size: 1em;
+  line-height: 1.4;
+}
+
+.glyphie-modal-input {
+  width: 90%;
+  padding: 12px 15px;
+  background: #000;
+  color: var(--accent-color);
+  border: 2px solid var(--accent-color);
+  border-radius: 8px;
+  font-size: 1em;
+  margin-bottom: 20px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.glyphie-modal-input:focus {
+  border-color: #fff;
+  box-shadow: 0 0 10px rgba(187, 255, 0, 0.5);
+}
+
+.glyphie-modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.glyphie-modal-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.9em;
+}
+
+.glyphie-modal-btn.primary {
+  background: var(--accent-color);
+  color: #000;
+}
+
+.glyphie-modal-btn.primary:hover {
+  background: #fff;
+  transform: translateY(-2px);
+}
+
+.glyphie-modal-btn.secondary {
+  background: #333;
+  color: #fff;
+  border: 2px solid #666;
+}
+
+.glyphie-modal-btn.secondary:hover {
+  background: #555;
+  border-color: #999;
+}

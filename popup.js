@@ -998,7 +998,12 @@ async function updateGallery(container) {
     deleteBtn.addEventListener("click", async (e) => {
       e.stopPropagation(); // Prevent item selection
 
-      if (confirm(`Delete "${displayName}"?`)) {
+      if (
+        await showCustomConfirm(
+          "Are you sure that you want to delete this ?",
+          `Delete "${displayName}"?`
+        )
+      ) {
         console.log("🗑️ Deleting snip:", snip.id);
 
         // Remove from storage
@@ -1024,7 +1029,12 @@ async function updateGallery(container) {
       e.stopPropagation(); // Prevent item selection
 
       const currentName = snip.name || "";
-      const newName = prompt(`Rename snip:`, currentName);
+      const newName = await showCustomPrompt(
+        "The extension Glyphie says",
+        "Rename snip:",
+        currentName,
+        "Enter new name"
+      );
 
       if (newName !== null && newName.trim() !== "") {
         console.log("✏️ Renaming snip:", snip.id, "to:", newName.trim());
@@ -1169,13 +1179,17 @@ function setupSnipEventListeners(snipContainer) {
   // NEW THREAD BUTTON - ADD THIS
   if (newThreadBtn) {
     newThreadBtn.addEventListener("click", async () => {
-      const threadName = prompt(
+      const threadName = await showCustomPrompt(
+        "The extension Glyphie says",
         "Enter thread name:",
-        `Thread ${snipThreads.length + 1}`
+        `Thread ${snipThreads.length + 1}`,
+        "Enter a name for your new thread"
       );
+
       if (threadName && threadName.trim()) {
         try {
           newThreadBtn.textContent = "Creating...";
+          newThreadBtn.style.background = "#9dff00ff";
           newThreadBtn.disabled = true;
 
           const newThread = await createSnipThread(threadName.trim());
@@ -1657,7 +1671,10 @@ attachmentInput.onchange = async (e) => {
       pendingAttachment = [{ type: "image", url: result.data.url }];
       pendingAttachmentPreviewUrl = result.data.url;
       renderAttachmentPreview();
-      alert("Image ready to send!");
+      await showCustomAlert(
+        "The extension Glyphie says",
+        "Image ready to send!"
+      );
     } else {
       throw new Error("Image upload failed");
     }
@@ -2519,7 +2536,12 @@ async function startChatWithPersonality(key) {
     }
 
     // Confirm regeneration
-    if (confirm("Regenerate the last response?")) {
+    if (
+      await showCustomConfirm(
+        "The extension Glyphie asks",
+        `Regenerate the last response ?`
+      )
+    ) {
       regenerateBtn.textContent = "Regenerating...";
       regenerateBtn.disabled = true;
 
@@ -3099,7 +3121,12 @@ function updateSnipThreadList() {
     // Event listeners
     deleteBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (confirm(`Delete thread "${thread.name}"?`)) {
+      if (
+        await showCustomConfirm(
+          "The extension Glyphie asks",
+          `Delete thread "${thread.name}"?`
+        )
+      ) {
         try {
           await deleteSnipThread(thread.id);
         } catch (error) {
@@ -3136,7 +3163,12 @@ async function deleteSnipThread(threadId) {
   const thread = snipThreads.find((t) => t.id === threadId);
   if (!thread) return;
 
-  if (!confirm(`Delete thread "${thread.name}"? This cannot be undone.`)) {
+  if (
+    !(await showCustomConfirm(
+      "The extension Glyphie Chat says",
+      `Delete thread "${thread.name}"? This cannot be undone.`
+    ))
+  ) {
     return;
   }
 
@@ -3288,6 +3320,194 @@ async function fetchThreadsFromAPI() {
     console.error("❌ Failed to fetch threads from API:", error);
     // Continue with local threads only
   }
+}
+// Custom styled prompt function
+function showCustomPrompt(title, message, defaultValue = "", placeholder = "") {
+  return new Promise((resolve) => {
+    // Create modal overlay
+    const overlay = document.createElement("div");
+    overlay.className = "glyphie-modal-overlay";
+
+    // Create modal content
+    overlay.innerHTML = `
+      <div class="glyphie-modal">
+        <div class="glyphie-modal-header">${title}</div>
+        <div class="glyphie-modal-body">${message}</div>
+        <input type="text" class="glyphie-modal-input" value="${defaultValue}" placeholder="${placeholder}" autocomplete="off">
+        <div class="glyphie-modal-buttons">
+          <button class="glyphie-modal-btn secondary" data-action="cancel">Cancel</button>
+          <button class="glyphie-modal-btn primary" data-action="ok">OK</button>
+        </div>
+      </div>
+    `;
+
+    // Add to DOM
+    document.body.appendChild(overlay);
+
+    // Focus input and select text
+    const input = overlay.querySelector(".glyphie-modal-input");
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 100);
+
+    // Handle buttons
+    overlay.addEventListener("click", (e) => {
+      if (
+        e.target.dataset.action === "ok" ||
+        e.target.closest('[data-action="ok"]')
+      ) {
+        resolve(input.value);
+        document.body.removeChild(overlay);
+      } else if (
+        e.target.dataset.action === "cancel" ||
+        e.target.closest('[data-action="cancel"]')
+      ) {
+        resolve(null);
+        document.body.removeChild(overlay);
+      } else if (e.target === overlay) {
+        // Click outside modal
+        resolve(null);
+        document.body.removeChild(overlay);
+      }
+    });
+
+    // Handle Enter/Escape keys
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        resolve(input.value);
+        document.body.removeChild(overlay);
+      } else if (e.key === "Escape") {
+        resolve(null);
+        document.body.removeChild(overlay);
+      }
+    });
+  });
+}
+// Custom Confirm Dialog (for "Regenerate the last response?" and "Delete Screenshot?")
+function showCustomConfirm(title, message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "glyphie-modal-overlay";
+
+    overlay.innerHTML = `
+      <div class="glyphie-modal">
+        <div class="glyphie-modal-header">${title}</div>
+        <div class="glyphie-modal-body">${message}</div>
+        <div class="glyphie-modal-buttons">
+          <button class="glyphie-modal-btn cancel" data-action="cancel">Cancel</button>
+          <button class="glyphie-modal-btn ok" data-action="ok">OK</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target.dataset.action === "ok") {
+        resolve(true);
+        document.body.removeChild(overlay);
+      } else if (e.target.dataset.action === "cancel" || e.target === overlay) {
+        resolve(false);
+        document.body.removeChild(overlay);
+      }
+    });
+
+    // Handle Escape key
+    const handleEscape = (e) => {
+      if (e.key === "Escape") {
+        resolve(false);
+        document.body.removeChild(overlay);
+        document.removeEventListener("keydown", handleEscape);
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+  });
+}
+
+// Custom Alert Dialog (for "Image ready to send!")
+function showCustomAlert(title, message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "glyphie-modal-overlay";
+
+    overlay.innerHTML = `
+      <div class="glyphie-modal">
+        <div class="glyphie-modal-header">${title}</div>
+        <div class="glyphie-modal-body">${message}</div>
+        <div class="glyphie-modal-buttons">
+          <button class="glyphie-modal-btn ok" data-action="ok">OK</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target.dataset.action === "ok" || e.target === overlay) {
+        resolve();
+        document.body.removeChild(overlay);
+      }
+    });
+
+    // Handle Escape key
+    const handleEscape = (e) => {
+      if (e.key === "Escape") {
+        resolve();
+        document.body.removeChild(overlay);
+        document.removeEventListener("keydown", handleEscape);
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+  });
+}
+
+// Custom Prompt Dialog (already provided earlier)
+function showCustomPrompt(title, message, defaultValue = "", placeholder = "") {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "glyphie-modal-overlay";
+
+    overlay.innerHTML = `
+      <div class="glyphie-modal">
+        <div class="glyphie-modal-header">${title}</div>
+        <div class="glyphie-modal-body">${message}</div>
+        <input type="text" class="glyphie-modal-input" value="${defaultValue}" placeholder="${placeholder}" autocomplete="off">
+        <div class="glyphie-modal-buttons">
+          <button class="glyphie-modal-btn cancel" data-action="cancel">Cancel</button>
+          <button class="glyphie-modal-btn ok" data-action="ok">OK</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const input = overlay.querySelector(".glyphie-modal-input");
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 100);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target.dataset.action === "ok") {
+        resolve(input.value);
+        document.body.removeChild(overlay);
+      } else if (e.target.dataset.action === "cancel" || e.target === overlay) {
+        resolve(null);
+        document.body.removeChild(overlay);
+      }
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        resolve(input.value);
+        document.body.removeChild(overlay);
+      } else if (e.key === "Escape") {
+        resolve(null);
+        document.body.removeChild(overlay);
+      }
+    });
+  });
 }
 
 document.addEventListener("DOMContentLoaded", init);
