@@ -1,4 +1,4 @@
-// background.js - FIXED VERSION (No cropping in service worker)
+// background.js - FIXED VERSION with proper overlay hiding and coordinate handling
 console.log("🔧 Background script loaded");
 
 let captureInProgress = false;
@@ -23,6 +23,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((result) => {
         captureInProgress = false;
         console.log("✅ BACKGROUND: Capture completed successfully");
+
+        // Set navigation flags for auto-redirect to snip page
+        chrome.storage.local.set({
+          "glyphie-goto-snip": true,
+          "glyphie-new-snip-id": result.id,
+          "glyphie-new-snip-timestamp": result.timestamp,
+        });
+
         sendResponse({ success: true, snipId: result.id });
       })
       .catch((error) => {
@@ -46,41 +54,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleCapture(coordinates, tabId) {
-  console.log("📸 BACKGROUND CAPTURE: Starting");
+  console.log("📸 BACKGROUND CAPTURE: Starting with coordinates:", coordinates);
 
   try {
-    // Step 1: Hide overlay before capture
-    console.log("🔸 BACKGROUND: Hiding overlay before capture");
+    // Step 1: Hide overlay with multiple attempts and verification
+    console.log("📸 BACKGROUND: Hiding overlay before capture");
     await chrome.scripting.executeScript({
       target: { tabId: tabId },
       func: () => {
-        const overlay = document.getElementById("glyphie-snip-overlay-v2");
-        if (overlay) {
-          overlay.style.display = "none";
-        }
+        return new Promise((resolve) => {
+          // Find and hide the overlay
+          const overlay = document.getElementById("glyphie-snip-overlay-v2");
+          if (overlay) {
+            overlay.style.display = "none";
+            overlay.style.visibility = "hidden";
+            overlay.style.opacity = "0";
+            overlay.style.zIndex = "-1";
+            console.log("🙈 CONTENT: Overlay hidden");
+          }
+
+          // Wait a bit longer to ensure overlay is fully hidden
+          setTimeout(() => {
+            resolve(true);
+          }, 200);
+        });
       },
     });
 
-    // Wait a bit for overlay to hide
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    console.log("📸 BACKGROUND: Overlay should be hidden, waiting...");
+    // Additional wait to ensure overlay is completely hidden
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Step 2: Capture full screenshot
-    console.log("🔸 BACKGROUND: Capturing visible tab");
+    console.log("📸 BACKGROUND: Capturing visible tab");
     const dataUrl = await chrome.tabs.captureVisibleTab(null, {
       format: "png",
       quality: 100,
     });
     console.log("📸 BACKGROUND: Screenshot captured, size:", dataUrl.length);
 
-    // Step 2: Send screenshot + coordinates to popup for cropping
-    console.log("📸 BACKGROUND: Sending to popup for cropping");
-    const croppedImage = await sendToCropInPopup(dataUrl, coordinates);
-    console.log(
-      "📸 BACKGROUND: Received cropped image, size:",
-      croppedImage.length
-    );
+    // Step 3: Crop the image with proper coordinate handling
+    console.log("📸 BACKGROUND: Cropping image with coordinates:", coordinates);
+    const croppedImage = await cropImageInBackground(dataUrl, coordinates);
+    console.log("📸 BACKGROUND: Image cropped, size:", croppedImage.length);
 
-    // Step 3: Create snip data
+    // Step 4: Create snip data
     const snipData = {
       id: Date.now(),
       data: croppedImage,
@@ -91,7 +109,7 @@ async function handleCapture(coordinates, tabId) {
       },
     };
 
-    // Step 4: Save to storage
+    // Step 5: Save to storage
     const result = await chrome.storage.local.get(["glyphie-snips"]);
     const existingSnips = result["glyphie-snips"] || [];
     existingSnips.push(snipData);
@@ -102,7 +120,7 @@ async function handleCapture(coordinates, tabId) {
       existingSnips.length
     );
 
-    // Step 5: Show success notification
+    // Step 6: Show success notification
     await chrome.scripting.executeScript({
       target: { tabId: tabId },
       func: (dimensions) => {
@@ -123,7 +141,7 @@ async function handleCapture(coordinates, tabId) {
           </div>
         `;
         document.body.appendChild(success);
-        setTimeout(() => success.remove(), 5000);
+        setTimeout(() => success.remove(), 3000);
       },
       args: [snipData.dimensions],
     });
@@ -131,58 +149,67 @@ async function handleCapture(coordinates, tabId) {
     return snipData;
   } catch (error) {
     console.error("❌ BACKGROUND: Capture failed:", error);
+
+    // Clean up overlay on error
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: () => {
+          const overlay = document.getElementById("glyphie-snip-overlay-v2");
+          if (overlay && overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+          }
+        },
+      });
+    } catch (cleanupError) {
+      console.warn("⚠️ BACKGROUND: Cleanup error:", cleanupError);
+    }
+
     throw error;
   }
 }
 
-async function sendToCropInPopup(dataUrl, coordinates) {
+async function cropImageInBackground(dataUrl, coordinates) {
   try {
-    // First try popup method
-    const popupResult = await new Promise((resolve) => {
-      chrome.runtime.sendMessage(
-        {
-          type: "CROP_IMAGE",
-          dataUrl: dataUrl,
-          coordinates: coordinates,
-        },
-        (response) => {
-          if (chrome.runtime.lastError || !response?.success) {
-            resolve(null);
-          } else {
-            resolve(response.croppedImage);
-          }
-        }
-      );
-      // Quick timeout for popup method
-      setTimeout(() => resolve(null), 1000);
-    });
-
-    if (popupResult) {
-      console.log("✅ BACKGROUND: Popup cropping succeeded");
-      return popupResult;
-    }
-
-    // Fallback: Create offscreen document for cropping
+    // First try using an offscreen document for reliable cropping
     console.log("🔄 BACKGROUND: Using offscreen document for cropping");
 
+    // Create offscreen document
     await chrome.offscreen.createDocument({
       url: "offscreen.html",
       reasons: ["DOM_SCRAPING"],
       justification: "Image cropping requires canvas manipulation",
     });
 
-    const croppedResult = await chrome.runtime.sendMessage({
-      type: "CROP_IN_OFFSCREEN",
-      dataUrl: dataUrl,
-      coordinates: coordinates,
+    // Send cropping request to offscreen document
+    const croppedResult = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "CROP_IN_OFFSCREEN",
+          dataUrl: dataUrl,
+          coordinates: coordinates,
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (response && response.success) {
+            resolve(response.croppedImage);
+          } else {
+            reject(new Error(response ? response.error : "Cropping failed"));
+          }
+        }
+      );
     });
 
+    // Close offscreen document
     await chrome.offscreen.closeDocument();
 
-    return croppedResult.croppedImage;
+    return croppedResult;
   } catch (error) {
-    console.error("⚠️ BACKGROUND: All cropping methods failed:", error);
-    // Last resort: return original image
+    console.error("⚠️ BACKGROUND: Offscreen cropping failed:", error);
+
+    // Fallback: return original image if cropping fails
+    console.log("🔄 BACKGROUND: Returning original image as fallback");
     return dataUrl;
   }
 }

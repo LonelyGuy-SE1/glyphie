@@ -289,7 +289,7 @@ function expandPopup() {
   }
 }
 
-// ROBUST content script function - Replace simpleSnipScript
+// ENHANCED content script function - Replace robustSnipScript in popup.js
 function robustSnipScript() {
   console.log(
     "🔧 CONTENT: Robust snip script starting on:",
@@ -315,231 +315,6 @@ function robustSnipScript() {
   }
 
   // Create persistent message listener
-  window.glyphieMessageListener = (message, sender, sendResponse) => {
-    console.log("📨 CONTENT: Received message:", message.type, "from:", sender);
-
-    if (message.type === "START_SNIP") {
-      console.log("📨 CONTENT: Processing START_SNIP request");
-
-      try {
-        createOverlay();
-        console.log("✅ CONTENT: Overlay created successfully");
-
-        // Send immediate response
-        sendResponse({
-          success: true,
-          message: "Overlay created",
-          timestamp: Date.now(),
-          url: window.location.href,
-        });
-
-        return false; // Don't keep channel open
-      } catch (error) {
-        console.error("❌ CONTENT: Error creating overlay:", error);
-        sendResponse({
-          success: false,
-          error: error.message,
-          timestamp: Date.now(),
-        });
-        return false;
-      }
-    }
-
-    console.log("📨 CONTENT: Unknown message type:", message.type);
-    return false;
-  };
-
-  // Add the persistent listener
-  chrome.runtime.onMessage.addListener(window.glyphieMessageListener);
-  console.log("✅ CONTENT: Message listener added");
-
-  function createOverlay() {
-    console.log("🔧 CONTENT: Creating overlay");
-
-    // Clean up any existing overlay
-    if (overlay && overlay.parentNode) {
-      overlay.parentNode.removeChild(overlay);
-    }
-
-    overlay = document.createElement("div");
-    overlay.id = "glyphie-snip-overlay-v2";
-    overlay.style.cssText = `
-      position: fixed !important;
-      top: 0 !important; left: 0 !important;
-      width: 100vw !important; height: 100vh !important;
-      background: rgba(0, 0, 0, 0.4) !important;
-      z-index: 2147483647 !important;
-      cursor: crosshair !important;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
-    `;
-
-    const instructions = document.createElement("div");
-    instructions.style.cssText = `
-      position: absolute !important; top: 30px !important; left: 50% !important;
-      transform: translateX(-50%) !important;
-      background: rgba(0, 0, 0, 0.95) !important; color: #bbff00 !important;
-      padding: 15px 25px !important; border: 3px solid #bbff00 !important;
-      border-radius: 10px !important; font-size: 16px !important;
-      font-weight: bold !important; text-align: center !important;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8) !important;
-    `;
-    instructions.innerHTML =
-      "✂️ Click and drag to select area<br><small>Press ESC to cancel</small>";
-
-    const selectionBox = document.createElement("div");
-    selectionBox.style.cssText = `
-      position: absolute !important;
-      border: 4px dashed #bbff00 !important;
-      background: rgba(187, 255, 0, 0.15) !important;
-      display: none !important; pointer-events: none !important;
-    `;
-
-    overlay.appendChild(instructions);
-    overlay.appendChild(selectionBox);
-
-    // Event handlers with error catching
-    overlay.onmousedown = (e) => {
-      try {
-        console.log("🖱️ CONTENT: Mouse down at", e.clientX, e.clientY);
-        isSelecting = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        selectionBox.style.left = startX + "px";
-        selectionBox.style.top = startY + "px";
-        selectionBox.style.width = "0px";
-        selectionBox.style.height = "0px";
-        selectionBox.style.display = "block";
-        instructions.innerHTML = "🎯 Dragging... Release to capture";
-        e.preventDefault();
-        e.stopPropagation();
-      } catch (error) {
-        console.error("❌ CONTENT: Mouse down error:", error);
-      }
-    };
-
-    overlay.onmousemove = (e) => {
-      if (!isSelecting) return;
-      try {
-        const width = Math.abs(e.clientX - startX);
-        const height = Math.abs(e.clientY - startY);
-        selectionBox.style.left = Math.min(startX, e.clientX) + "px";
-        selectionBox.style.top = Math.min(startY, e.clientY) + "px";
-        selectionBox.style.width = width + "px";
-        selectionBox.style.height = height + "px";
-        instructions.innerHTML = `📏 ${Math.round(width)} × ${Math.round(
-          height
-        )}px<br><small>Release to capture</small>`;
-      } catch (error) {
-        console.error("❌ CONTENT: Mouse move error:", error);
-      }
-    };
-
-    overlay.onmouseup = (e) => {
-      if (!isSelecting) return;
-      isSelecting = false;
-
-      try {
-        console.log("🖱️ CONTENT: Mouse up, processing selection");
-        const rect = selectionBox.getBoundingClientRect();
-
-        if (rect.width > 20 && rect.height > 20) {
-          instructions.innerHTML = "✅ Capturing... Please wait";
-          instructions.style.borderColor = "#00ff88";
-
-          const coordinates = {
-            x: rect.left,
-            y: rect.top,
-            width: rect.width,
-            height: rect.height,
-          };
-
-          console.log(
-            "📸 CONTENT: Sending CAPTURE_AREA with coordinates:",
-            coordinates
-          );
-
-          // Send capture message with error handling
-          chrome.runtime.sendMessage(
-            {
-              type: "CAPTURE_AREA",
-              coordinates: coordinates,
-              timestamp: Date.now(),
-              url: window.location.href,
-            },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                console.error(
-                  "❌ CONTENT: Error sending capture message:",
-                  chrome.runtime.lastError
-                );
-              } else {
-                console.log(
-                  "✅ CONTENT: Capture message sent, response:",
-                  response
-                );
-              }
-            }
-          );
-
-          // Remove overlay after a delay
-          setTimeout(() => {
-            try {
-              if (overlay && overlay.parentNode) {
-                overlay.parentNode.removeChild(overlay);
-                overlay = null;
-              }
-              window[SCRIPT_ID] = false; // Allow re-injection
-            } catch (error) {
-              console.error("❌ CONTENT: Error removing overlay:", error);
-            }
-          }, 1000);
-        } else {
-          instructions.innerHTML = "❌ Area too small! Try again";
-          instructions.style.borderColor = "#ff4444";
-          selectionBox.style.display = "none";
-
-          setTimeout(() => {
-            instructions.innerHTML =
-              "✂️ Click and drag to select area<br><small>Press ESC to cancel</small>";
-            instructions.style.borderColor = "#bbff00";
-          }, 2000);
-        }
-      } catch (error) {
-        console.error("❌ CONTENT: Mouse up error:", error);
-      }
-    };
-
-    // ESC key handler
-    const escapeHandler = (e) => {
-      if (e.key === "Escape" && overlay) {
-        console.log("⌨️ CONTENT: ESC pressed, removing overlay");
-        try {
-          if (overlay && overlay.parentNode) {
-            overlay.parentNode.removeChild(overlay);
-            overlay = null;
-          }
-          document.removeEventListener("keydown", escapeHandler);
-          window[SCRIPT_ID] = false; // Allow re-injection
-        } catch (error) {
-          console.error("❌ CONTENT: Error in escape handler:", error);
-        }
-      }
-    };
-
-    document.addEventListener("keydown", escapeHandler);
-
-    // Add overlay to page
-    try {
-      document.body.appendChild(overlay);
-      console.log("✅ CONTENT: Overlay added to page successfully");
-    } catch (error) {
-      console.error("❌ CONTENT: Failed to add overlay to page:", error);
-      throw error;
-    }
-  }
-
-  console.log("✅ CONTENT: Robust snip script loaded successfully");
-  // UPDATED message listener in robustSnipScript - Add TEST_CONNECTION handling
   window.glyphieMessageListener = (message, sender, sendResponse) => {
     console.log("📨 CONTENT: Received message:", message.type, "from:", sender);
 
@@ -583,8 +358,247 @@ function robustSnipScript() {
     console.log("📨 CONTENT: Unknown message type:", message.type);
     return false;
   };
-}
 
+  // Add the persistent listener
+  chrome.runtime.onMessage.addListener(window.glyphieMessageListener);
+  console.log("✅ CONTENT: Message listener added");
+
+  function createOverlay() {
+    console.log("🔧 CONTENT: Creating overlay");
+
+    // Clean up any existing overlay
+    if (overlay && overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
+
+    overlay = document.createElement("div");
+    overlay.id = "glyphie-snip-overlay-v2";
+    overlay.style.cssText = `
+      position: fixed !important;
+      top: 0 !important; left: 0 !important;
+      width: 100vw !important; height: 100vh !important;
+      background: rgba(0, 0, 0, 0.3) !important;
+      z-index: 2147483647 !important;
+      cursor: crosshair !important;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
+      user-select: none !important;
+    `;
+
+    const instructions = document.createElement("div");
+    instructions.style.cssText = `
+      position: absolute !important; top: 30px !important; left: 50% !important;
+      transform: translateX(-50%) !important;
+      background: rgba(0, 0, 0, 0.95) !important; color: #bbff00 !important;
+      padding: 15px 25px !important; border: 3px solid #bbff00 !important;
+      border-radius: 10px !important; font-size: 16px !important;
+      font-weight: bold !important; text-align: center !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8) !important;
+      pointer-events: none !important;
+    `;
+    instructions.innerHTML =
+      "✂️ Click and drag to select area<br><small>Press ESC to cancel</small>";
+
+    const selectionBox = document.createElement("div");
+    selectionBox.style.cssText = `
+      position: absolute !important;
+      border: 3px dashed #bbff00 !important;
+      background: rgba(187, 255, 0, 0.1) !important;
+      display: none !important; 
+      pointer-events: none !important;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3) !important;
+    `;
+
+    overlay.appendChild(instructions);
+    overlay.appendChild(selectionBox);
+
+    // Event handlers with better coordinate tracking
+    overlay.addEventListener("mousedown", (e) => {
+      try {
+        console.log("🖱️ CONTENT: Mouse down at screen:", e.clientX, e.clientY);
+        console.log("🖱️ CONTENT: Page scroll:", window.scrollX, window.scrollY);
+        console.log(
+          "🖱️ CONTENT: Viewport size:",
+          window.innerWidth,
+          window.innerHeight
+        );
+
+        isSelecting = true;
+
+        // Use clientX/Y for screen coordinates (what we want for cropping)
+        startX = e.clientX;
+        startY = e.clientY;
+
+        selectionBox.style.left = startX + "px";
+        selectionBox.style.top = startY + "px";
+        selectionBox.style.width = "0px";
+        selectionBox.style.height = "0px";
+        selectionBox.style.display = "block";
+        instructions.innerHTML = "🎯 Dragging... Release to capture";
+
+        e.preventDefault();
+        e.stopPropagation();
+      } catch (error) {
+        console.error("❌ CONTENT: Mouse down error:", error);
+      }
+    });
+
+    overlay.addEventListener("mousemove", (e) => {
+      if (!isSelecting) return;
+      try {
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+
+        const width = Math.abs(currentX - startX);
+        const height = Math.abs(currentY - startY);
+        const left = Math.min(startX, currentX);
+        const top = Math.min(startY, currentY);
+
+        selectionBox.style.left = left + "px";
+        selectionBox.style.top = top + "px";
+        selectionBox.style.width = width + "px";
+        selectionBox.style.height = height + "px";
+
+        instructions.innerHTML = `📏 ${Math.round(width)} × ${Math.round(
+          height
+        )}px<br><small>Release to capture</small>`;
+      } catch (error) {
+        console.error("❌ CONTENT: Mouse move error:", error);
+      }
+    });
+
+    overlay.addEventListener("mouseup", (e) => {
+      if (!isSelecting) return;
+      isSelecting = false;
+
+      try {
+        console.log("🖱️ CONTENT: Mouse up, processing selection");
+
+        const currentX = e.clientX;
+        const currentY = e.clientY;
+
+        const width = Math.abs(currentX - startX);
+        const height = Math.abs(currentY - startY);
+        const left = Math.min(startX, currentX);
+        const top = Math.min(startY, currentY);
+
+        console.log("📏 CONTENT: Selection area:", {
+          left,
+          top,
+          width,
+          height,
+        });
+
+        if (width > 10 && height > 10) {
+          instructions.innerHTML = "✅ Capturing... Please wait";
+          instructions.style.borderColor = "#00ff88";
+          instructions.style.color = "#00ff88";
+
+          // Use viewport coordinates for the capture
+          const coordinates = {
+            x: left,
+            y: top,
+            width: width,
+            height: height,
+          };
+
+          console.log(
+            "📸 CONTENT: Sending CAPTURE_AREA with coordinates:",
+            coordinates
+          );
+
+          // Send capture message
+          chrome.runtime.sendMessage(
+            {
+              type: "CAPTURE_AREA",
+              coordinates: coordinates,
+              timestamp: Date.now(),
+              url: window.location.href,
+              viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                scrollX: window.scrollX,
+                scrollY: window.scrollY,
+              },
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                console.error(
+                  "❌ CONTENT: Error sending capture message:",
+                  chrome.runtime.lastError
+                );
+              } else {
+                console.log(
+                  "✅ CONTENT: Capture message sent, response:",
+                  response
+                );
+              }
+            }
+          );
+
+          // Hide overlay immediately after sending coordinates
+          overlay.style.display = "none";
+
+          // Remove overlay after a delay
+          setTimeout(() => {
+            try {
+              if (overlay && overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+                overlay = null;
+              }
+              window[SCRIPT_ID] = false; // Allow re-injection
+            } catch (error) {
+              console.error("❌ CONTENT: Error removing overlay:", error);
+            }
+          }, 500);
+        } else {
+          instructions.innerHTML = "❌ Area too small! Try again";
+          instructions.style.borderColor = "#ff4444";
+          instructions.style.color = "#ff4444";
+          selectionBox.style.display = "none";
+
+          setTimeout(() => {
+            instructions.innerHTML =
+              "✂️ Click and drag to select area<br><small>Press ESC to cancel</small>";
+            instructions.style.borderColor = "#bbff00";
+            instructions.style.color = "#bbff00";
+          }, 2000);
+        }
+      } catch (error) {
+        console.error("❌ CONTENT: Mouse up error:", error);
+      }
+    });
+
+    // ESC key handler
+    const escapeHandler = (e) => {
+      if (e.key === "Escape" && overlay) {
+        console.log("⌨️ CONTENT: ESC pressed, removing overlay");
+        try {
+          if (overlay && overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+            overlay = null;
+          }
+          document.removeEventListener("keydown", escapeHandler);
+          window[SCRIPT_ID] = false; // Allow re-injection
+        } catch (error) {
+          console.error("❌ CONTENT: Error in escape handler:", error);
+        }
+      }
+    };
+
+    document.addEventListener("keydown", escapeHandler);
+
+    // Add overlay to page
+    try {
+      document.body.appendChild(overlay);
+      console.log("✅ CONTENT: Overlay added to page successfully");
+    } catch (error) {
+      console.error("❌ CONTENT: Failed to add overlay to page:", error);
+      throw error;
+    }
+  }
+
+  console.log("✅ CONTENT: Robust snip script loaded successfully");
+}
 // ROBUST captureScreenshotArea - Replace existing one
 async function captureScreenshotArea(coordinates) {
   console.log("📸 CAPTURE: Starting with coordinates:", coordinates);
