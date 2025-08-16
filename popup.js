@@ -498,6 +498,90 @@ async function init() {
     applySavedTheme();
   }
 }
+async function logChatUsage(characterKey) {
+  try {
+    const result = await chrome.storage.local.get(["glyphie-usage"]);
+    const usage = result["glyphie-usage"] || {
+      chats: [],
+      snips: 0,
+      lastUsed: null,
+    };
+    usage.chats = Array.isArray(usage.chats) ? usage.chats : [];
+    usage.chats.push({
+      character: characterKey || "unknown",
+      time: Date.now(),
+    });
+    usage.lastUsed = new Date().toLocaleString();
+    await chrome.storage.local.set({ "glyphie-usage": usage });
+    console.log("📈 Usage updated (chat)");
+  } catch (e) {
+    console.error("❌ Failed to update usage (chat):", e);
+  }
+}
+
+async function renderStats() {
+  console.log("📊 Debug: renderStats() called");
+
+  // 1) Clone and mount the usage section (same pattern as renderSnip)
+  const usageSection = document.getElementById("usage-section");
+  if (!usageSection) {
+    console.error("❌ Usage section template not found in DOM");
+    mainContent.textContent =
+      "❌ Usage section unavailable. Element not found in DOM.";
+    return;
+  }
+
+  mainContent.innerHTML = "";
+  const usageClone = usageSection.cloneNode(true);
+  usageClone.classList.remove("hidden");
+  usageClone.id = "active-usage-section";
+  mainContent.appendChild(usageClone);
+
+  // 2) Query fields inside the cloned section
+  const elSnips = usageClone.querySelector("#stats-total-snips");
+  const elMsgs = usageClone.querySelector("#stats-total-messages");
+  const elTop = usageClone.querySelector("#stats-top-character");
+  const elLast = usageClone.querySelector("#stats-last-used");
+
+  if (!elSnips || !elMsgs || !elTop || !elLast) {
+    console.error("❌ Stats elements missing in cloned usage section");
+    return;
+  }
+
+  // 3) Load and populate stats
+  try {
+    const result = await chrome.storage.local.get([
+      "glyphie-snips",
+      "glyphie-usage",
+    ]);
+    const snips = result["glyphie-snips"] || [];
+    const usage = result["glyphie-usage"] || {
+      chats: [],
+      snips: 0,
+      lastUsed: "–",
+    };
+
+    elSnips.textContent = snips.length;
+
+    const chats = Array.isArray(usage.chats) ? usage.chats : [];
+    elMsgs.textContent = chats.length;
+
+    const charCounts = chats.reduce((acc, c) => {
+      const key = c?.character || "unknown";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Fixed topChar logic
+    const topChar =
+      Object.entries(charCounts).sort((a, b) => b[1] - a[1])?.[0]?.[0] || "–";
+    elTop.textContent = topChar;
+
+    elLast.textContent = usage.lastUsed || "–";
+  } catch (e) {
+    console.error("❌ Error rendering usage stats:", e);
+  }
+}
 
 // UPDATED renderSnip - Force gallery refresh multiple ways
 function renderSnip() {
@@ -1390,6 +1474,9 @@ function loadSection(section) {
     case "stats":
       renderStats();
       break;
+    case "usage":
+      renderStats();
+      break;
     case "settings":
       renderSettings();
       break;
@@ -1504,13 +1591,6 @@ function renderCharacters() {
   });
 
   mainContent.appendChild(container);
-}
-
-function renderStats() {
-  const div = document.createElement("div");
-  div.className = "placeholder";
-  div.textContent = "Usage stats will appear here soon. Stay tuned!";
-  mainContent.appendChild(div);
 }
 
 function renderSettings() {
@@ -3079,4 +3159,11 @@ if (!window.popupCropListener) {
     return false;
   });
 }
+function logUsage(character) {
+  const chats = JSON.parse(localStorage.getItem("glyphie-chats") || "[]");
+  chats.push({ character, time: Date.now() });
+  localStorage.setItem("glyphie-chats", JSON.stringify(chats));
+  localStorage.setItem("glyphie-last-used", new Date().toLocaleString());
+}
+
 document.addEventListener("DOMContentLoaded", init);
