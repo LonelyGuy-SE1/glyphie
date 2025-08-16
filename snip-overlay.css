@@ -70,8 +70,8 @@
   border: 4px dashed #bbff00 !important;
   background: rgba(187, 255, 0, 0.15) !important;
   display: none !important;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8) !important,
-    inset 0 0 50px rgba(187, 255, 0, 0.2) !important;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8) !important;
+  inset: 0 0 50px rgba(187, 255, 0, 0.2) !important;
   animation: glyphie-snip-selection 1s infinite ease-in-out !important;
   pointer-events: none !important;
 }
