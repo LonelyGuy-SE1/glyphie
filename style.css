@@ -1846,3 +1846,14 @@ body.light .theme-label {
   background: #555;
   border-color: #999;
 }
+/* Clear Thread Button Enhancement */
+#toolbar-clear-thread-btn:hover {
+  background: linear-gradient(135deg, #ff4444, #ff6666) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 68, 68, 0.3);
+}
+
+#toolbar-clear-thread-btn:active {
+  transform: translateY(0);
+}

@@ -7,6 +7,12 @@ const characters = [
     image: "avatars/white.png",
   },
   {
+    key: "purple",
+    name: "Agent Purple",
+    bio: "Purple is a witty, unpredictable AI agent that trades, replies, and entertains—all at once. Equal parts meme lord and market sniper, it handles serious tasks with a not-so-serious attitude.",
+    image: "avatars/purple.webp",
+  },
+  {
     key: "dev",
     name: "Stack Monk",
     bio: "I exist to bring clarity to chaos — guiding you through full-stack development with calm, precision, and mindful mastery.",
@@ -25,6 +31,9 @@ const characterApiKeys = {
   white: "pk-7a4dbd1aa8d5b8a7b9bb320acee0bc25deab56639c84ddf88e1b82fd2e8dc4c9",
   dev: "pk-f4101d1b38a8a1a784a8351c0364493caa107b2c3b7a0eead077c3c1bd615df8",
   cat: "pk-70d8684a117f9e22c2383180def7f4e18ab4b73fb8024283466a80b4bdd77ab4",
+  purple: "pk-ce528a023ba5eb934500b5d2b32178fb85e6a3a13de3d98a33c3701d29a9b8b4",
+  snipper:
+    "pk-9c6ff052919cc4063b18de766a31724e7dc50d27461f1c1bfa08a3a1e749e4a8",
 };
 
 const BASE_URL = "https://open.service.crestal.network/v1";
@@ -752,7 +761,9 @@ async function captureScreenshotArea(coordinates) {
 // ENHANCED init function - Auto-navigate to snip page after capture
 async function init() {
   console.log("🔧 INIT: Extension initializing...");
-
+  trackUsage("session", {
+    timestamp: Date.now(),
+  });
   // Check navigation flags from chrome.storage
   try {
     const result = await chrome.storage.local.get([
@@ -1379,6 +1390,13 @@ async function handleSnipSend(chatHistoryDiv, message) {
   // Add user message if provided
   if (message) {
     appendSnipMessage(chatHistoryDiv, "user", message, timestamp);
+
+    // Track the snip message
+    trackUsage("message", {
+      character: "Snip Chat",
+      messageLength: message.length,
+      type: "snip_message",
+    });
   }
 
   // Add selected snips to chat display with names
@@ -1455,7 +1473,7 @@ async function handleSnipSend(chatHistoryDiv, message) {
     console.log("📤 Attachments:", uploadedImages);
 
     // SEND TO CURRENT THREAD - MODIFY THIS
-    const apiKey = characterApiKeys.white;
+    const apiKey = characterApiKeys.snipper;
     const chatId = currentSnipThreadId; // Use current thread instead of creating new one
 
     if (!chatId) {
@@ -1864,6 +1882,7 @@ function renderCharacters() {
   mainContent.appendChild(container);
 }
 
+// Enhanced renderStats function (async version)
 async function renderStats() {
   console.log("📊 Debug: renderStats() called");
 
@@ -1899,32 +1918,88 @@ async function renderStats() {
       "glyphie-snips",
       "glyphie-usage",
     ]);
+
     const snips = result["glyphie-snips"] || [];
     const usage = result["glyphie-usage"] || {
-      chats: [],
-      snips: 0,
-      lastUsed: "–",
+      totalMessages: 0,
+      totalSnips: 0,
+      charactersUsed: {},
+      sessionsStarted: 0,
+      lastUsed: null,
+      dailyStats: {},
     };
 
+    // Update total snips (sync with actual snips count)
     elSnips.textContent = snips.length;
 
-    const chats = Array.isArray(usage.chats) ? usage.chats : [];
-    elMsgs.textContent = chats.length;
+    // Update total messages
+    elMsgs.textContent = usage.totalMessages;
 
-    const charCounts = chats.reduce((acc, c) => {
-      const key = c?.character || "unknown";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Fixed topChar logic
-    const topChar =
-      Object.entries(charCounts).sort((a, b) => b[1] - a[1])?.[0]?.[0] || "–";
+    // Find most used character
+    const charEntries = Object.entries(usage.charactersUsed);
+    const topCharEntry = charEntries.sort((a, b) => b[1] - a[1])[0];
+    const topChar = topCharEntry ? topCharEntry[0] : "–";
     elTop.textContent = topChar;
 
-    elLast.textContent = usage.lastUsed || "–";
+    // Format last used time
+    let lastUsedText = "–";
+    if (usage.lastUsed) {
+      const lastUsedDate = new Date(usage.lastUsed);
+      const now = new Date();
+      const diffMs = now - lastUsedDate;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) {
+        lastUsedText = "Just now";
+      } else if (diffMins < 60) {
+        lastUsedText = `${diffMins}m ago`;
+      } else if (diffHours < 24) {
+        lastUsedText = `${diffHours}h ago`;
+      } else {
+        lastUsedText = `${diffDays}d ago`;
+      }
+    }
+    elLast.textContent = lastUsedText;
+
+    // Add a refresh button if not already present
+    addStatsRefreshButton(usageClone);
   } catch (e) {
     console.error("❌ Error rendering usage stats:", e);
+    elSnips.textContent = "Error";
+    elMsgs.textContent = "Error";
+    elTop.textContent = "Error";
+    elLast.textContent = "Error";
+  }
+}
+
+// Add refresh functionality to stats
+function addStatsRefreshButton(container) {
+  let refreshBtn = container.querySelector("#stats-refresh-btn");
+  if (!refreshBtn) {
+    const chatHeader = container.querySelector(".chat-header");
+    if (chatHeader) {
+      refreshBtn = document.createElement("button");
+      refreshBtn.id = "stats-refresh-btn";
+      refreshBtn.innerHTML = "🔄 Refresh";
+      refreshBtn.style.cssText = `
+        background: var(--accent-color);
+        color: #000;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-left: 10px;
+        font-size: 0.9em;
+      `;
+      refreshBtn.onclick = () => {
+        console.log("📊 Refreshing stats...");
+        renderStats();
+      };
+      chatHeader.appendChild(refreshBtn);
+    }
   }
 }
 
@@ -1937,7 +2012,8 @@ function renderSettings() {
 
   const label = document.createElement("label");
   label.htmlFor = "theme-toggle";
-  label.textContent = "Dark Mode:";
+  label.textContent = "Dark Mode: (Beta)";
+  label.style.fontSize = "1.5rem";
 
   const toggle = document.createElement("input");
   toggle.type = "checkbox";
@@ -2002,6 +2078,11 @@ async function getChatHistory(chatId, personaKey, limit = 100) {
 
 // Send message streaming with optional attachments
 async function sendMessageToThread(chatId, personaKey, message) {
+  trackUsage("message", {
+    character: personaKey,
+    messageLength: message ? message.length : 0,
+    type: "regular_chat",
+  });
   const personaApiKey = characterApiKeys[personaKey];
   if (!personaApiKey) throw new Error("API key for persona not found");
 
@@ -2363,6 +2444,15 @@ function setMessageTimestamp(msg, timestamp) {
 
 async function startChatWithPersonality(key) {
   currentCharKey = key;
+
+  // Track character selection
+  const selectedChar = characters.find((c) => c.key === key);
+  trackUsage("message", {
+    character: selectedChar?.name || key,
+    messageLength: 0,
+    type: "character_selected",
+  });
+
   chatHistory = [];
   mainContent.innerHTML = "";
 
@@ -2448,6 +2538,27 @@ async function startChatWithPersonality(key) {
   regenerateBtn.title = "Regenerate response";
   regenerateBtn.setAttribute("aria-label", "Regenerate response");
   regenerateBtn.textContent = "Regenerate";
+  // CREATE CLEAR THREAD BUTTON
+  const clearThreadBtn = document.createElement("button");
+  clearThreadBtn.id = "toolbar-clear-thread-btn";
+  clearThreadBtn.title = "Start new thread";
+  clearThreadBtn.setAttribute("aria-label", "Start new thread");
+  clearThreadBtn.textContent = "🗑️ Clear";
+  // ADD CLEAR THREAD BUTTON HOVER EFFECTS
+  clearThreadBtn.addEventListener("mouseover", () => {
+    clearThreadBtn.style.background = "#ff4444";
+    clearThreadBtn.style.color = "#fff";
+  });
+
+  clearThreadBtn.addEventListener("mouseout", () => {
+    clearThreadBtn.style.background = "var(--button-bg)";
+    clearThreadBtn.style.color = "var(--accent-color)";
+  });
+
+  // ADD CLEAR THREAD BUTTON SIZE
+  clearThreadBtn.style.fontSize = "0.9rem";
+  clearThreadBtn.style.padding = "6px 12px";
+  clearThreadBtn.style.marginLeft = "8px";
 
   // Style for toolbar buttons
   regenerateBtn.addEventListener("mouseover", () => {
@@ -2457,7 +2568,7 @@ async function startChatWithPersonality(key) {
   regenerateBtn.addEventListener("mouseout", () => {
     regenerateBtn.style.background = "var(--button-bg)";
   });
-  [attachBtnToolbar, regenerateBtn].forEach((btn) => {
+  [attachBtnToolbar, regenerateBtn, clearThreadBtn].forEach((btn) => {
     btn.style.cursor = "pointer";
     btn.style.borderRadius = "8px";
     btn.style.border = "none";
@@ -2472,7 +2583,7 @@ async function startChatWithPersonality(key) {
   regenerateBtn.style.fontSize = "1rem";
   regenerateBtn.style.padding = "6px 12px";
 
-  toolbar.append(attachBtnToolbar, regenerateBtn);
+  toolbar.append(attachBtnToolbar, regenerateBtn, clearThreadBtn);
 
   const input = document.createElement("textarea");
   input.id = "chat-input";
@@ -2497,6 +2608,106 @@ async function startChatWithPersonality(key) {
   const sendBtn = document.createElement("button");
   sendBtn.id = "chat-send-btn";
   sendBtn.textContent = "Send";
+  // ADD CLEAR THREAD BUTTON FUNCTIONALITY
+  // ADD CLEAR THREAD BUTTON FUNCTIONALITY
+  clearThreadBtn.addEventListener("click", async () => {
+    // Show confirmation dialog
+    const confirmed = await showCustomConfirm(
+      "Clear Thread",
+      "Are you sure you want to start a new thread? This will clear all messages in the current conversation."
+    );
+
+    if (confirmed) {
+      try {
+        // Clear the chat history UI immediately
+        const chatHistoryDiv = document.getElementById("chat-history");
+        if (chatHistoryDiv) {
+          chatHistoryDiv.innerHTML = "";
+        }
+
+        // Create new thread based on current context
+        if (currentCharKey) {
+          console.log("🗑️ Creating new thread for character:", currentCharKey);
+
+          // For character chats - use existing createChatThread function
+          const oldChatId = currentChatId;
+
+          // Clear stored chat ID to force creating new one
+          localStorage.removeItem(`intentkit_chatid_${currentCharKey}`);
+
+          // Create new chat thread using existing function
+          currentChatId = await createChatThread(currentCharKey);
+
+          console.log("✅ New character thread created:", currentChatId);
+
+          // Show success message
+          if (chatHistoryDiv) {
+            appendMessage(
+              chatHistoryDiv,
+              "system",
+              "🗑️ Thread cleared! Started a new conversation.",
+              new Date().toISOString()
+            );
+          }
+        } else if (currentSnipThreadId) {
+          console.log("🗑️ Creating new snip thread");
+
+          // For snip threads - use existing createSnipThread function
+          const newThread = await createSnipThread("New Thread");
+          currentSnipThreadId = newThread.id;
+
+          // Update storage
+          localStorage.setItem(
+            "glyphie-current-snip-thread",
+            currentSnipThreadId
+          );
+
+          // Update thread list if exists
+          updateSnipThreadList();
+
+          console.log("✅ New snip thread created:", newThread.id);
+
+          // Show success message
+          if (chatHistoryDiv) {
+            appendMessage(
+              chatHistoryDiv,
+              "system",
+              "🗑️ Thread cleared! Started a new conversation.",
+              new Date().toISOString()
+            );
+          }
+        } else {
+          console.warn("No active thread context found");
+
+          // Show informational message
+          if (chatHistoryDiv) {
+            chatHistoryDiv.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #666;">
+              <div style="font-size: 2em; margin-bottom: 10px;">🗑️</div>
+              <div>Thread cleared! Ready for a new conversation.</div>
+            </div>
+          `;
+          }
+        }
+      } catch (error) {
+        console.error("❌ Error clearing thread:", error);
+
+        // Show error message
+        const chatHistoryDiv = document.getElementById("chat-history");
+        if (chatHistoryDiv) {
+          appendMessage(
+            chatHistoryDiv,
+            "system",
+            `❌ Failed to clear thread: ${error.message}`,
+            new Date().toISOString(),
+            true // isError flag
+          );
+        }
+
+        alert(`Failed to clear thread: ${error.message}`);
+      }
+    }
+  });
 
   sendBtn.addEventListener("click", async () => {
     const userInput = input.value.trim();
@@ -2721,7 +2932,7 @@ async function loadSnipChatHistory(chatHistoryDiv) {
     console.log("📜 Loading history for chat:", chatId);
 
     // Load chat history
-    const history = await getChatHistory(chatId, "white", 50);
+    const history = await getChatHistory(chatId, "snipper", 50);
 
     if (history.length === 0) {
       chatHistoryDiv.innerHTML = `
@@ -2924,7 +3135,7 @@ async function createSnipThread(name = null) {
 
   try {
     // Create thread via API
-    const apiKey = characterApiKeys.white;
+    const apiKey = characterApiKeys.snipper;
     const response = await fetch(`${BASE_URL}/chats`, {
       method: "POST",
       headers: {
@@ -3001,7 +3212,7 @@ async function loadSnipThreadHistory(chatHistoryDiv, threadId) {
   }
 
   try {
-    const apiKey = characterApiKeys.white;
+    const apiKey = characterApiKeys.snipper;
     const response = await fetch(
       `${BASE_URL}/chats/${threadId}/messages?limit=50`,
       {
@@ -3176,7 +3387,7 @@ async function deleteSnipThread(threadId) {
 
   try {
     // Delete from API (optional - threads might auto-delete when empty)
-    const apiKey = characterApiKeys.white;
+    const apiKey = characterApiKeys.snipper;
     await fetch(`${BASE_URL}/chats/${threadId}`, {
       method: "DELETE",
       headers: {
@@ -3278,7 +3489,7 @@ async function fetchThreadsFromAPI() {
   console.log("🔍 Fetching existing threads from API...");
 
   try {
-    const apiKey = characterApiKeys.white;
+    const apiKey = characterApiKeys.snipper;
     const response = await fetch(`${BASE_URL}/chats`, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -3509,5 +3720,142 @@ function showCustomPrompt(title, message, defaultValue = "", placeholder = "") {
     });
   });
 }
+// === USAGE STATS ENHANCEMENT ===
+
+function trackUsage(type, data = {}) {
+  console.log("📊 TRACKING:", type, data);
+
+  chrome.storage.local.get(["glyphie-usage"], (result) => {
+    const usage = result["glyphie-usage"] || {
+      totalMessages: 0,
+      totalSnips: 0,
+      charactersUsed: {},
+      sessionsStarted: 0,
+      lastUsed: Date.now(),
+      dailyStats: {},
+    };
+
+    const today = new Date().toDateString();
+    if (!usage.dailyStats[today]) {
+      usage.dailyStats[today] = { messages: 0, snips: 0, sessions: 0 };
+    }
+
+    switch (type) {
+      case "message":
+        // Only count user messages, not bot responses
+        if (
+          data.type &&
+          (data.type.includes("user") || data.type.includes("snip"))
+        ) {
+          usage.totalMessages++;
+          usage.dailyStats[today].messages++;
+          if (data.character && data.character !== "unknown") {
+            usage.charactersUsed[data.character] =
+              (usage.charactersUsed[data.character] || 0) + 1;
+          }
+          console.log(
+            "📊 User message tracked for:",
+            data.character,
+            "Total:",
+            usage.totalMessages
+          );
+        }
+        break;
+      case "snip":
+        usage.totalSnips++;
+        usage.dailyStats[today].snips++;
+        break;
+      case "session":
+        usage.sessionsStarted++;
+        usage.dailyStats[today].sessions++;
+        break;
+    }
+
+    usage.lastUsed = Date.now();
+    chrome.storage.local.set({ "glyphie-usage": usage });
+  });
+}
+
+// === USAGE TRACKING INTEGRATION ===
+
+// Initialize usage tracking when the extension loads
+document.addEventListener("DOMContentLoaded", function () {
+  // Track session start when popup loads
+  trackUsage("session", {});
+  console.log("📊 Session started");
+
+  // Global click event listener for tracking various interactions
+  document.addEventListener("click", function (event) {
+    // Track chat messages
+    if (
+      event.target &&
+      (event.target.id === "chat-send-btn" ||
+        event.target.id === "snip-send-btn" ||
+        event.target.id === "active-snip-send-btn")
+    ) {
+      // Find the corresponding input field
+      let input;
+      if (event.target.id === "chat-send-btn") {
+        input = document.getElementById("chat-input");
+      } else {
+        input =
+          document.getElementById("snip-chat-input") ||
+          document.getElementById("active-snip-input");
+      }
+
+      const message = input ? input.value.trim() : "";
+      if (message) {
+        trackUsage("message", {
+          character: currentCharKey || "unknown",
+          messageLength: message.length,
+          type: "sent",
+        });
+        console.log(
+          "📊 Message tracked:",
+          message.length,
+          "chars for",
+          currentCharKey || "unknown"
+        );
+      }
+    }
+
+    // Track snip button clicks
+    if (
+      event.target &&
+      (event.target.id === "snip-btn" || event.target.id === "active-snip-btn")
+    ) {
+      trackUsage("snip", { type: "initiated" });
+      console.log("📊 Snip initiated");
+    }
+
+    // Track character selection
+    if (event.target && event.target.classList.contains("select-btn")) {
+      const charCard = event.target.closest(".character-card");
+      const charName = charCard
+        ? charCard.querySelector(".character-name")?.textContent
+        : "unknown";
+      trackUsage("message", {
+        character: charName,
+        messageLength: 0,
+        type: "character_selected",
+      });
+      console.log("📊 Character selected:", charName);
+    }
+  });
+
+  // Track successful snip completion by listening to storage changes
+  if (chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+      if (namespace === "local" && changes["glyphie-snips"]) {
+        const newSnips = changes["glyphie-snips"].newValue || [];
+        const oldSnips = changes["glyphie-snips"].oldValue || [];
+
+        if (newSnips.length > oldSnips.length) {
+          console.log("📊 Snip completed and saved to storage");
+        }
+      }
+    });
+  }
+});
 
 document.addEventListener("DOMContentLoaded", init);
